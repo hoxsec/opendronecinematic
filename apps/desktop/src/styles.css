@@ -409,6 +409,22 @@ input[type='range'] {
 .globe .cesium-viewer-bottom {
   left: 8px;
 }
+.map-mode-switch {
+  position: absolute;
+  z-index: 2;
+  top: 50px;
+  right: 8px;
+  display: flex;
+}
+.map-mode-switch button:first-child {
+  border-radius: 4px 0 0 4px;
+}
+.map-mode-switch button:last-child {
+  border-radius: 0 4px 4px 0;
+}
+.pane.is-mini .map-mode-switch {
+  display: none;
+}
 .mode-hint {
   position: absolute;
   top: 10px;

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   evaluateSafety,
   waypointHeight,
@@ -25,6 +25,7 @@ export let activeScene: MissionScene | undefined;
 export function GlobeView() {
   const ref = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<MissionScene | undefined>(undefined);
+  const [mapMode, setMapMode] = useState<'2D' | '3D'>('3D');
   const mission = useStore((s) => s.mission);
   const selectedId = useStore((s) => s.selectedId);
   const settings = useStore((s) => s.settings);
@@ -222,7 +223,32 @@ export function GlobeView() {
     };
   }, [mission, settings, dem]);
 
-  return <div ref={ref} className={`globe mode-${mode}`} />;
+  const switchMapMode = (next: '2D' | '3D') => {
+    const scene = sceneRef.current?.viewer.scene;
+    if (!scene || next === mapMode) return;
+    if (next === '2D') scene.morphTo2D(0);
+    else scene.morphTo3D(0);
+    setMapMode(next);
+  };
+
+  return (
+    <>
+      <div ref={ref} className={`globe mode-${mode}`} />
+      <div className="map-mode-switch segmented" role="group" aria-label="Map view mode">
+        {(['2D', '3D'] as const).map((view) => (
+          <button
+            key={view}
+            className={mapMode === view ? 'active' : ''}
+            aria-pressed={mapMode === view}
+            onClick={() => switchMapMode(view)}
+            title={`${view} map view`}
+          >
+            {view}
+          </button>
+        ))}
+      </div>
+    </>
+  );
 }
 
 /** Obstacles shown on the map: those within this distance of the path (airfields: their radius). */
