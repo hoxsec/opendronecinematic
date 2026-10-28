@@ -10,9 +10,11 @@ import {
   type Scene,
   type ImageryLayerCollection,
 } from 'cesium';
+import type { Dem } from '@odc/core';
+import { createDemTerrainProvider } from './dem';
 
 export type ImagerySource = 'ion' | 'osm';
-export type TerrainSource = 'ion' | 'none';
+export type TerrainSource = 'ion' | 'none' | 'geotiff';
 export type BuildingSource = 'none' | 'osm' | 'google';
 
 export interface DataSourceSettings {
@@ -23,6 +25,10 @@ export interface DataSourceSettings {
   buildings: BuildingSource;
   /** URLs of the user's own 3D Tiles tileset.json files (photogrammetry, scans, ...). */
   customTilesets: string[];
+  /** File name of the loaded GeoTIFF DEM (the raster itself is kept in IndexedDB). */
+  demName?: string;
+  /** Metres added to DEM heights, usually the geoid height to turn sea-level heights into WGS84. */
+  demOffset: number;
 }
 
 export const DEFAULT_DATA_SOURCES: DataSourceSettings = {
@@ -31,6 +37,7 @@ export const DEFAULT_DATA_SOURCES: DataSourceSettings = {
   terrain: 'ion',
   buildings: 'osm',
   customTilesets: [],
+  demOffset: 0,
 };
 
 /** Resolve requested sources against what is actually possible without a token. */
@@ -39,7 +46,8 @@ export function effectiveSources(s: DataSourceSettings): DataSourceSettings {
   return {
     ...s,
     imagery: hasToken ? s.imagery : 'osm',
-    terrain: hasToken ? s.terrain : 'none',
+    // A local DEM works offline; Cesium World Terrain needs the token.
+    terrain: s.terrain === 'geotiff' || hasToken ? s.terrain : 'none',
     buildings: hasToken ? s.buildings : 'none',
   };
 }
@@ -58,6 +66,7 @@ export async function applySources(
   layers: ImageryLayerCollection,
   settings: DataSourceSettings,
   previous: Cesium3DTileset[] = [],
+  dem?: Dem,
 ): Promise<AppliedSources> {
   const s = effectiveSources(settings);
   const errors: string[] = [];
@@ -83,8 +92,13 @@ export async function applySources(
   }
 
   try {
+    if (s.terrain === 'geotiff' && !dem) errors.push('Terrain: the GeoTIFF DEM is not loaded.');
     scene.terrainProvider =
-      s.terrain === 'ion' ? await createWorldTerrainAsync() : new EllipsoidTerrainProvider();
+      s.terrain === 'ion'
+        ? await createWorldTerrainAsync()
+        : s.terrain === 'geotiff' && dem
+          ? createDemTerrainProvider(dem)
+          : new EllipsoidTerrainProvider();
   } catch (e) {
     errors.push(`Terrain: ${message(e)}`);
     scene.terrainProvider = new EllipsoidTerrainProvider();

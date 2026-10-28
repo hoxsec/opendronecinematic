@@ -14,6 +14,7 @@ export function GlobeView() {
   const mission = useStore((s) => s.mission);
   const selectedId = useStore((s) => s.selectedId);
   const settings = useStore((s) => s.settings);
+  const dem = useStore((s) => s.dem);
   const time = useStore((s) => s.time);
   const safety = useStore((s) => s.safety);
   const focusToken = useStore((s) => s.focusToken);
@@ -42,9 +43,11 @@ export function GlobeView() {
     const scene = sceneRef.current;
     if (!scene) return;
     let cancelled = false;
-    scene.setSources(settings).then(async (errors) => {
+    scene.setSources(settings, dem).then(async (errors) => {
       if (cancelled) return;
-      if (errors.length) useStore.getState().notify(errors.join(' · '), 'error');
+      // The DEM loads asynchronously on startup and reports its own errors.
+      const shown = dem ? errors : errors.filter((e) => !e.includes('GeoTIFF'));
+      if (shown.length) useStore.getState().notify(shown.join(' · '), 'error');
       // With an empty plan, pick up the real ground height at the default takeoff.
       const { mission: m, setMission } = useStore.getState();
       if (m.waypoints.length === 0) {
@@ -56,7 +59,7 @@ export function GlobeView() {
     return () => {
       cancelled = true;
     };
-  }, [settings]);
+  }, [settings, dem]);
 
   // Mouse interaction, routed by the current tool mode.
   useEffect(() => {
@@ -70,17 +73,20 @@ export function GlobeView() {
         if (md === 'addWaypoint') st().addWaypointAt(pos);
         else if (md === 'addPoi') st().addPoiAt(pos);
         else if (md === 'setTakeoff') st().setTakeoffAt(pos);
+        else if (md === 'drawSurvey') st().addSurveyVertex(pos);
         else st().select(undefined);
       },
       onSelect(t: PickTarget) {
         dragStarted = false;
-        if (t.kind !== 'takeoff') st().select(t.id);
+        if (t.kind === 'waypoint' || t.kind === 'poi') st().select(t.id);
       },
       onDrag(t, pos) {
         const history = !dragStarted;
         dragStarted = true;
         const { mission: m } = st();
-        if (t.kind === 'waypoint') {
+        if (t.kind === 'vertex') {
+          st().moveSurveyVertex(t.index, pos, { history });
+        } else if (t.kind === 'waypoint') {
           const wp = m.waypoints.find((w) => w.id === t.id);
           if (!wp) return;
           // Keep the same height above ground while dragging in relative/AGL modes.
@@ -148,7 +154,7 @@ export function GlobeView() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [mission, settings]);
+  }, [mission, settings, dem]);
 
   return <div ref={ref} className={`globe mode-${mode}`} />;
 }

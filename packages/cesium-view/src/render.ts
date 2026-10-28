@@ -7,6 +7,7 @@ import {
   type Cesium3DTileset,
   type Event,
 } from 'cesium';
+import type { Dem } from '@odc/core';
 import { applySources, type DataSourceSettings } from './sources';
 import { applyPose, type CameraPose } from './pose';
 
@@ -20,6 +21,8 @@ export interface OfflineRendererOptions {
   height: number;
   horizontalFovDeg: number;
   settings: DataSourceSettings;
+  /** The loaded GeoTIFF DEM, when the settings use one for terrain. */
+  dem?: Dem;
   /** Give up waiting for tiles on a frame after this long and render what is loaded. */
   tileTimeoutMs?: number;
 }
@@ -76,7 +79,13 @@ export class OfflineRenderer {
 
   static async create(opts: OfflineRendererOptions) {
     const r = new OfflineRenderer(opts);
-    const { tilesets } = await applySources(r.widget.scene, r.widget.imageryLayers, opts.settings);
+    const { tilesets } = await applySources(
+      r.widget.scene,
+      r.widget.imageryLayers,
+      opts.settings,
+      [],
+      opts.dem,
+    );
     for (const t of tilesets) t.maximumScreenSpaceError = 4;
     r.tilesets = tilesets;
     return r;

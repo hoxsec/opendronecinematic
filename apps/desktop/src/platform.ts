@@ -52,6 +52,31 @@ export async function openTextFile(filters: FileFilter[]): Promise<string | unde
   });
 }
 
+/** Pick any file and read its bytes, keeping the name so the caller can tell formats apart. */
+export async function openBinaryFile(
+  filters: FileFilter[],
+): Promise<{ name: string; data: Uint8Array } | undefined> {
+  if (isTauri()) {
+    const { open } = await import('@tauri-apps/plugin-dialog');
+    const { readFile } = await import('@tauri-apps/plugin-fs');
+    const path = await open({ multiple: false, directory: false, filters });
+    if (typeof path !== 'string') return undefined;
+    return { name: path.split(/[\\/]/).pop() ?? path, data: await readFile(path) };
+  }
+  return new Promise((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = filters.flatMap((f) => f.extensions.map((e) => `.${e}`)).join(',');
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      resolve(
+        file ? { name: file.name, data: new Uint8Array(await file.arrayBuffer()) } : undefined,
+      );
+    };
+    input.click();
+  });
+}
+
 /**
  * Let the user pick a local 3D Tiles folder (desktop only) and return a URL Cesium can load.
  * Tauri adds dialog-picked paths to the asset protocol scope, so no broad file access is granted.

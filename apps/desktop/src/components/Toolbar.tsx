@@ -1,6 +1,13 @@
 import { createMission, parseMission, serializeMission } from '@odc/core';
+import {
+  IMPORT_EXTENSIONS,
+  importHome,
+  importMissionFile,
+  importedToMission,
+} from '@odc/exporters';
 import { useStore, type Mode } from '../store';
-import { openTextFile, saveFile } from '../platform';
+import { openBinaryFile, saveFile } from '../platform';
+import { activeScene } from './GlobeView';
 import { useView } from '../viewStore';
 
 const MODES: { value: Mode; label: string; key: string }[] = [
@@ -11,6 +18,28 @@ const MODES: { value: Mode; label: string; key: string }[] = [
 ];
 
 const FILTERS = [{ name: 'OpenDroneCinematic mission', extensions: ['json'] }];
+const OPEN_FILTERS = [
+  { name: 'Missions', extensions: ['json', ...IMPORT_EXTENSIONS] },
+  ...FILTERS,
+  { name: 'Litchi CSV', extensions: ['csv'] },
+  { name: 'DJI KMZ / WPML', extensions: ['kmz', 'kml', 'wpml'] },
+  { name: 'QGroundControl plan', extensions: ['plan'] },
+  { name: 'Mission Planner waypoints', extensions: ['waypoints', 'txt'] },
+];
+
+/** Read another app's mission file, sampling the ground so heights land where they should. */
+async function importMission(name: string, data: Uint8Array) {
+  const plan = importMissionFile(name, data);
+  const home = importHome(plan);
+  const ground = (await activeScene?.sampleGround([home, ...plan.waypoints])) ?? [];
+  const st = useStore.getState();
+  const mission = importedToMission(plan, st.mission, {
+    home: ground[0] ?? 0,
+    waypoints: ground.slice(1),
+  });
+  mission.name = name.replace(/\.[^.]+$/, '');
+  return { mission, plan };
+}
 
 export function Toolbar({
   onExport,
@@ -40,9 +69,16 @@ export function Toolbar({
 
   const open = async () => {
     try {
-      const text = await openTextFile(FILTERS);
-      if (!text) return;
-      setMission(parseMission(text));
+      const file = await openBinaryFile(OPEN_FILTERS);
+      if (!file) return;
+      if (file.name.toLowerCase().endsWith('.json')) {
+        setMission(parseMission(new TextDecoder().decode(file.data)));
+      } else {
+        const { mission, plan } = await importMission(file.name, file.data);
+        setMission(mission);
+        const extra = plan.warnings.length ? ` ${plan.warnings.join(' ')}` : '';
+        notify(`Imported ${plan.waypoints.length} waypoints from ${plan.format}.${extra}`);
+      }
       useStore.getState().setTime(0);
       focusMission();
     } catch (e) {
@@ -64,7 +100,12 @@ export function Toolbar({
       </div>
       <div className="group">
         <button onClick={newMission}>New</button>
-        <button onClick={open}>Open…</button>
+        <button
+          onClick={open}
+          title="Open a mission, or import Litchi CSV, DJI KMZ, QGC .plan or Mission Planner files"
+        >
+          Open…
+        </button>
         <button onClick={save}>Save…</button>
         <button className="primary" onClick={onExport}>
           Export…

@@ -109,7 +109,7 @@ interface Action {
   params: [string, string | number][];
 }
 
-function waypointActions(a: WaypointAction): Action {
+function waypointActions(a: WaypointAction): Action | undefined {
   switch (a.type) {
     case 'hover':
       return { func: 'hover', params: [['hoverTime', round(a.seconds, 1)]] };
@@ -131,7 +131,30 @@ function waypointActions(a: WaypointAction): Action {
       };
     case 'stopRecording':
       return { func: 'stopRecord', params: [['payloadPositionIndex', 0]] };
+    case 'photoDistance':
+      // Becomes a multipleDistance action group spanning the legs, see actionGroups.
+      return undefined;
   }
+}
+
+const takePhoto = waypointActions({ type: 'photo' })!;
+
+/** For each point that starts interval photos: the spacing and the index where they stop. */
+function photoRuns(points: ExportPoint[]) {
+  const runs = new Map<number, { meters: number; end: number }>();
+  let open: { start: number; meters: number } | undefined;
+  const close = (end: number) => {
+    if (open && end > open.start) runs.set(open.start, { meters: open.meters, end });
+    open = undefined;
+  };
+  points.forEach((p, i) => {
+    const a = p.actions.filter((x) => x.type === 'photoDistance').pop();
+    if (!a) return;
+    close(i);
+    if (a.meters > 0) open = { start: i, meters: a.meters };
+  });
+  close(points.length - 1);
+  return runs;
 }
 
 const gimbalParams = (pitch: number): [string, string | number][] => [
@@ -139,10 +162,21 @@ const gimbalParams = (pitch: number): [string, string | number][] => [
   ['payloadPositionIndex', 0],
 ];
 
-function actionGroups(points: ExportPoint[], i: number, nextGroupId: () => number) {
+function actionGroups(
+  points: ExportPoint[],
+  i: number,
+  nextGroupId: () => number,
+  photoRun?: { meters: number; end: number },
+) {
   const p = points[i]!;
   const groups: string[] = [];
-  const group = (trigger: string, start: number, endIdx: number, actions: Action[]) =>
+  const group = (
+    trigger: string,
+    start: number,
+    endIdx: number,
+    actions: Action[],
+    triggerParam?: number,
+  ) =>
     `        <wpml:actionGroup>
 ${tags('          ', [
   ['actionGroupId', nextGroupId()],
@@ -151,7 +185,12 @@ ${tags('          ', [
   ['actionGroupMode', 'sequence'],
 ])}
           <wpml:actionTrigger>
-            <wpml:actionTriggerType>${trigger}</wpml:actionTriggerType>
+            <wpml:actionTriggerType>${trigger}</wpml:actionTriggerType>${
+              triggerParam === undefined
+                ? ''
+                : `
+            <wpml:actionTriggerParam>${triggerParam}</wpml:actionTriggerParam>`
+            }
           </wpml:actionTrigger>
 ${actions
   .map(
@@ -185,8 +224,14 @@ ${tags('              ', a.params)}
       ],
     });
   }
-  atPoint.push(...p.actions.map(waypointActions));
+  for (const a of p.actions) {
+    const action = waypointActions(a);
+    if (action) atPoint.push(action);
+  }
   if (atPoint.length) groups.push(group('reachPoint', i, i, atPoint));
+  if (photoRun) {
+    groups.push(group('multipleDistance', i, photoRun.end, [takePhoto], round(photoRun.meters, 1)));
+  }
 
   // Tilt evenly toward the next point's pitch over the whole leg for smooth gimbal moves.
   const next = points[i + 1];
@@ -212,6 +257,7 @@ export function buildWpml(mission: Mission, opts: DjiExportOptions = {}): Export
 
   let groupId = 0;
   const templateGroups = () => groupId++;
+  const runs = photoRuns(points);
   const placemarks = (wayline: boolean) => {
     groupId = 0;
     return points
@@ -242,7 +288,7 @@ ${common}
 ${headingParam(p)}
 ${turnParam(p, i, points.length, smooth)}
         <wpml:useStraightLine>${smooth ? 0 : 1}</wpml:useStraightLine>
-${actionGroups(points, i, templateGroups)}
+${actionGroups(points, i, templateGroups, runs.get(i))}
       </Placemark>`;
       })
       .join('\n');

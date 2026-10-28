@@ -41,16 +41,19 @@
 
 ## ✨ Features
 
-| Feature                        | What it does                                                                                                     |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| 🌍 **Plan on a real 3D globe** | Cesium World Terrain, aerial imagery, OSM Buildings, Google Photorealistic 3D Tiles, or your own photogrammetry. |
-| 🎯 **Aim the camera exactly**  | Points of interest, heading and gimbal modes per waypoint, smooth easing between them.                           |
-| 🎥 **See what the drone sees** | A live camera view using the drone's real field of view. Swap it with the map at any time.                       |
-| 🕹️ **Fly mode**                | Fly a simulated drone with keyboard, mouse or gamepad. Drop waypoints, mark POIs, or record a flight path.       |
-| 🎬 **Shot templates**          | Orbit, helix, reveal, dolly, fly-by and dronie, generated around a subject in one click.                         |
-| 🛡️ **Safety checks**           | Terrain and building clearance, 120 m ceiling, range, speed, climb rate and battery.                             |
-| 📤 **Export to your drone**    | Litchi CSV and DJI WPML/KMZ, with an option to match the preview exactly.                                        |
-| 🎞️ **Render previz video**     | Frame-exact MP4, WebM or GIF at up to 4K. Compare takes side by side with the live view.                         |
+| Feature                        | What it does                                                                                                      |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| 🌍 **Plan on a real 3D globe** | Cesium World Terrain, aerial imagery, OSM Buildings, Google Photorealistic 3D Tiles, or your own photogrammetry.  |
+| 🎯 **Aim the camera exactly**  | Points of interest, heading and gimbal modes per waypoint, smooth easing between them.                            |
+| 🎥 **See what the drone sees** | A live camera view using the drone's real field of view. Swap it with the map at any time.                        |
+| 🕹️ **Fly mode**                | Fly a simulated drone with keyboard, mouse or gamepad. Drop waypoints, mark POIs, or record a flight path.        |
+| 🎬 **Shot templates**          | Orbit, helix, reveal, dolly, fly-by and dronie, generated around a subject in one click.                          |
+| 🗺️ **Survey grids**            | Draw an area, set height and overlap, get a lawnmower grid with GSD, photo count and distance-triggered photos.   |
+| 🛡️ **Safety checks**           | Terrain and building clearance, 120 m ceiling, range, speed, climb rate and battery.                              |
+| 📤 **Export to your drone**    | Litchi CSV, DJI WPML/KMZ, QGroundControl `.plan` and Mission Planner, with an option to match the preview.        |
+| 📥 **Import missions**         | Open Litchi CSV, DJI KMZ, QGC `.plan` and Mission Planner files to preview, edit and re-export them.              |
+| ⛰️ **GeoTIFF terrain**         | Load your own elevation model (SRTM, Copernicus, lidar) for offline terrain, safety checks and terrain following. |
+| 🎞️ **Render previz video**     | Frame-exact MP4, WebM or GIF at up to 4K. Compare takes side by side with the live view.                          |
 
 ---
 
@@ -147,7 +150,22 @@ A recorded path is simplified into waypoints that keep your **position, camera y
   </tr>
 </table>
 
-### 6. Safety checks
+### 6. Survey grids for mapping
+
+Open **Survey**, click **Draw area** (or press `G`) and click the corners of the area on the globe. Drag the green corners to adjust; undo removes the last one. Then set:
+
+- **Height (AGL)**: sets the ground sample distance (GSD), shown live in cm/px for the selected drone's camera
+- **Front / side overlap**: the spacing between photos along a line and between lines (75% / 65% by default)
+- **Line angle**: or click **Auto** to run lines along the longest edge for the fewest turns
+- **Overshoot**: extends lines past the outline so the edges are fully covered
+- **Terrain follow**: adds a waypoint every _N_ metres along each line at the survey height above the ground, for hilly sites
+- **Crosshatch**: flies a second grid at 90° for 3D reconstruction
+
+**Generate waypoints** builds a serpentine of nadir lines with a fixed heading. Each line starts photos every _N_ metres at its first waypoint and stops them at its last, so the turns take no photos. The panel shows the area, GSD, line count, photo spacing and an estimated photo count, and warns when the photo interval is too fast for the camera.
+
+Distance-triggered photos export as Litchi `photo_distinterval`, DJI WPML `multipleDistance` action groups and MAVLink `DO_SET_CAM_TRIGG_DIST`.
+
+### 7. Safety checks
 
 <table>
   <tr>
@@ -169,7 +187,7 @@ A recorded path is simplified into waypoints that keep your **position, camera y
 > [!NOTE]
 > Clearance checks need real terrain, so add a free Cesium ion token (see [Map data](#map-data)). Airspace restrictions are **not** checked yet.
 
-### 7. Export to your drone
+### 8. Export to your drone
 
 <table>
   <tr>
@@ -178,14 +196,16 @@ A recorded path is simplified into waypoints that keep your **position, camera y
       <ul>
         <li><b>Litchi CSV</b>: import it in Litchi Mission Hub (heading mode: Custom). Supports POI focus, gimbal interpolation, curves and actions. Max 99 waypoints.</li>
         <li><b>DJI KMZ (WPML)</b>: works in DJI Pilot 2 and FlightHub 2 (M30, Mavic 3E, M350). Supports <code>towardPOI</code> headings, smooth gimbal moves and actions. DJI Fly needs a file-swap workaround.</li>
+        <li><b>QGroundControl .plan</b> and <b>Mission Planner .waypoints</b>: MAVLink missions for PX4 and ArduPilot, with speed changes, ROI (POI) tracking, gimbal pitch, photos, video and distance-triggered survey photos.</li>
         <li><b>Match preview exactly</b>: replaces your waypoints with points every <i>N</i> metres along the previewed path, each with its exact heading and tilt baked in.</li>
       </ul>
+      <p><b>Open…</b> also imports all four formats, so you can preview, check and convert missions made in other apps.</p>
       <p>See <a href="docs/exports.md">docs/exports.md</a> for the full mapping and known limits.</p>
     </td>
   </tr>
 </table>
 
-### 8. Render a previz video
+### 9. Render a previz video
 
 <table>
   <tr>
@@ -204,7 +224,7 @@ A recorded path is simplified into waypoints that keep your **position, camera y
 
 While it renders, a **REC overlay** shows the frame count, file size, time remaining and any frames where tiles were slow to load. You can cancel at any time.
 
-### 9. Takes and side-by-side compare
+### 10. Takes and side-by-side compare
 
 <img src="docs/images/takes-compare.webp" alt="Compare mode: live 3D camera view on the left, rendered take on the right, at the same moment" width="100%">
 
@@ -212,16 +232,16 @@ Every render becomes a **take** that plays right inside the camera view. Open **
 
 ### Drone profiles
 
-| Profile                    | Lens (35 mm eq.) | Max speed | Flight time | Exports                    |
-| -------------------------- | ---------------- | --------- | ----------- | -------------------------- |
-| DJI Mini 4 Pro             | 24 mm            | 16 m/s    | 34 min      | Litchi, DJI KMZ¹           |
-| DJI Air 3 (wide)           | 24 mm            | 21 m/s    | 46 min      | Litchi, DJI KMZ¹           |
-| DJI Mavic 3 (Hasselblad)   | 24 mm            | 21 m/s    | 46 min      | Litchi, DJI KMZ¹           |
-| DJI Mavic 3 Enterprise     | 24 mm            | 15 m/s    | 45 min      | DJI KMZ                    |
-| DJI Matrice 30 (wide)      | 24 mm            | 23 m/s    | 41 min      | DJI KMZ                    |
-| DJI Matrice 350 RTK + H20  | 24 mm            | 23 m/s    | 55 min      | DJI KMZ                    |
-| ArduPilot / PX4 multirotor | 24 mm            | 12 m/s    | 20 min      | QGC `.plan` (coming in M2) |
-| Custom                     | yours            | yours     | yours       | all                        |
+| Profile                    | Lens (35 mm eq.) | Max speed | Flight time | Exports                      |
+| -------------------------- | ---------------- | --------- | ----------- | ---------------------------- |
+| DJI Mini 4 Pro             | 24 mm            | 16 m/s    | 34 min      | Litchi, DJI KMZ¹             |
+| DJI Air 3 (wide)           | 24 mm            | 21 m/s    | 46 min      | Litchi, DJI KMZ¹             |
+| DJI Mavic 3 (Hasselblad)   | 24 mm            | 21 m/s    | 46 min      | Litchi, DJI KMZ¹             |
+| DJI Mavic 3 Enterprise     | 24 mm            | 15 m/s    | 45 min      | DJI KMZ                      |
+| DJI Matrice 30 (wide)      | 24 mm            | 23 m/s    | 41 min      | DJI KMZ                      |
+| DJI Matrice 350 RTK + H20  | 24 mm            | 23 m/s    | 55 min      | DJI KMZ                      |
+| ArduPilot / PX4 multirotor | 24 mm            | 12 m/s    | 20 min      | QGC `.plan`, Mission Planner |
+| Custom                     | yours            | yours     | yours       | all                          |
 
 ¹ DJI Fly has no KMZ import. Enum values for consumer drones are community-sourced; please help verify them.
 
@@ -232,6 +252,8 @@ Without a token the app shows OpenStreetMap on flat terrain, which is what the s
 1. Create a free account at [ion.cesium.com](https://ion.cesium.com/).
 2. Copy your default access token.
 3. Paste it in **Map data**. The token is stored only on your computer.
+
+To work offline or with better local data, pick **Terrain → GeoTIFF DEM (local)** and load a single-band elevation GeoTIFF in WGS84 (EPSG:4326), Web Mercator or UTM. Most DEMs are heights above sea level, so set **Height offset** to the local geoid height (about +48 m in central Europe) to get WGS84 heights. Reproject other coordinate systems first, for example with `gdalwarp -t_srs EPSG:4326 in.tif out.tif`.
 
 Under **Your own 3D Tiles** you can add photogrammetry or scans exported as 3D Tiles. In the browser, give a URL. In the desktop app, you can also browse to a local folder.
 
@@ -281,6 +303,7 @@ npm run tauri build
 | `W`   | Add waypoints | `Tab`               | Swap camera / map |
 | `P`   | Add POI       | `F`                 | Fly mode          |
 | `T`   | Set takeoff   | `Del`               | Delete selected   |
+| `G`   | Draw survey   |                     |                   |
 | `Esc` | Cancel / exit | `Ctrl+Z` / `Ctrl+Y` | Undo / redo       |
 
 ---
@@ -290,8 +313,10 @@ npm run tauri build
 ```
 apps/desktop/          Tauri 2 + React app (src/ is the UI, src-tauri/ is the Rust shell)
 packages/core/         Pure TypeScript: geodesy, mission model, spline path and timing,
-                       camera maths, drone profiles, safety, shot templates, flight sim
-packages/exporters/    Litchi CSV and DJI WPML/KMZ writers with golden-file tests
+                       camera maths, drone profiles, safety, shot templates, flight sim,
+                       survey grids, DEM sampling and UTM maths
+packages/exporters/    Litchi CSV, DJI WPML/KMZ, QGC .plan and Mission Planner writers and
+                       importers, with golden-file and round-trip tests
 packages/cesium-view/  CesiumJS: data sources, mission rendering, picking, ground sampling,
                        camera view and the offline frame renderer
 docs/                  Architecture, export notes, logo and screenshots
@@ -310,7 +335,7 @@ If you change an exporter on purpose, update its golden files with `npx vitest r
 ## 🗺️ Roadmap
 
 - [x] **M1: cinematic planning.** Waypoints, POIs, camera preview, templates, safety, Litchi and DJI export, fly mode, video renders
-- [ ] **M2: mapping and more drones.** Survey grids (polygon, overlap, GSD), QGroundControl `.plan` / MAVLink export, GeoTIFF terrain, importing KMZ, Litchi and `.plan` files
+- [x] **M2: mapping and more drones.** Survey grids (polygon, overlap, GSD), QGroundControl `.plan` / MAVLink export, GeoTIFF terrain, importing KMZ, Litchi and `.plan` files
 - [ ] **M3: polish.** Airspace overlays, signed installers with auto-update, a plugin API for exporters
 
 ## 🤝 Contributing

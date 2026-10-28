@@ -10,6 +10,7 @@ const MODE_HINT = {
   addWaypoint: 'Click the globe to add waypoints · Esc to finish',
   addPoi: 'Click what the camera should look at',
   setTakeoff: 'Click the takeoff / home point',
+  drawSurvey: 'Click to add survey area corners · drag to adjust · Esc to finish',
 } as const;
 
 const MAP_MINI_ASPECT = 16 / 10;

@@ -8,6 +8,7 @@ import { MissionPanel } from './components/MissionPanel';
 import { WaypointPanel } from './components/WaypointPanel';
 import { PoiPanel } from './components/PoiPanel';
 import { ShotPanel } from './components/ShotPanel';
+import { SurveyPanel } from './components/SurveyPanel';
 import { SafetyPanel } from './components/SafetyPanel';
 import { ExportDialog } from './components/ExportDialog';
 import { SettingsDialog } from './components/SettingsDialog';
@@ -41,7 +42,13 @@ export function App() {
       } else if (!mod && e.key.toLowerCase() === 'f') {
         if (!view.render) view.setFly(true);
       } else if (!mod) {
-        const modes = { v: 'select', w: 'addWaypoint', p: 'addPoi', t: 'setTakeoff' } as const;
+        const modes = {
+          v: 'select',
+          w: 'addWaypoint',
+          p: 'addPoi',
+          t: 'setTakeoff',
+          g: 'drawSurvey',
+        } as const;
         const m = modes[e.key.toLowerCase() as keyof typeof modes];
         if (m) st.setMode(m);
       }
@@ -63,6 +70,7 @@ export function App() {
         <WaypointPanel />
         <PoiPanel />
         <ShotPanel />
+        <SurveyPanel />
         <SafetyPanel />
       </aside>
       <Workspace />

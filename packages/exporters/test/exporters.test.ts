@@ -1,26 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { unzipSync, strFromU8 } from 'fflate';
-import { createMission, generateShot, type Mission } from '@odc/core';
 import { buildWpml, exportDjiKmz, exportLitchiCsv, toExportPoints } from '../src';
-
-const NOW = Date.UTC(2026, 0, 1);
-
-function orbitMission(profile = 'dji-mavic-3e'): Mission {
-  const m = createMission({ lat: 47.3769, lon: 8.5417, groundHeight: 450 }, profile);
-  const shot = generateShot(m, 'orbit', {
-    subject: { id: 'poi_tower', name: 'Tower', lat: 47.3772, lon: 8.5421, height: 480 },
-    groundHeight: 450,
-    radius: 50,
-    height: 40,
-    startBearing: 180,
-    sweep: 180,
-  });
-  m.waypoints = shot.waypoints;
-  m.waypoints[0]!.actions = [{ type: 'startRecording' }, { type: 'hover', seconds: 2 }];
-  m.waypoints[m.waypoints.length - 1]!.actions = [{ type: 'stopRecording' }];
-  m.pois = [shot.poi];
-  return m;
-}
+import { NOW, orbitMission } from './fixtures';
 
 describe('litchi csv', () => {
   it('matches the golden file', async () => {

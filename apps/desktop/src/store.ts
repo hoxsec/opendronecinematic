@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import {
+  DEFAULT_SURVEY,
+  Dem,
   altFromHeight,
   changeAltitudeMode,
   createMission,
@@ -12,11 +14,13 @@ import {
   type Mission,
   type PointOfInterest,
   type SafetyReport,
+  type SurveySpec,
   type Waypoint,
 } from '@odc/core';
-import { DEFAULT_DATA_SOURCES, type DataSourceSettings } from '@odc/cesium-view';
+import { DEFAULT_DATA_SOURCES, readGeoTiffDem, type DataSourceSettings } from '@odc/cesium-view';
+import { loadDemFile } from './demStore';
 
-export type Mode = 'select' | 'addWaypoint' | 'addPoi' | 'setTakeoff';
+export type Mode = 'select' | 'addWaypoint' | 'addPoi' | 'setTakeoff' | 'drawSurvey';
 
 const SETTINGS_KEY = 'odc.settings.v1';
 const AUTOSAVE_KEY = 'odc.autosave.v1';
@@ -55,6 +59,8 @@ interface State {
   playing: boolean;
   safety?: SafetyReport;
   settings: DataSourceSettings;
+  /** The decoded GeoTIFF terrain, when one is loaded. */
+  dem?: Dem;
   /** Bumped when the user explicitly asks to fly the camera to the mission. */
   focusToken: number;
   toast?: { text: string; kind: 'info' | 'error' };
@@ -69,6 +75,7 @@ interface State {
   setPlaying(p: boolean): void;
   setSafety(s?: SafetyReport): void;
   setSettings(s: Partial<DataSourceSettings>): void;
+  setDem(dem?: Dem): void;
   focusMission(): void;
   notify(text: string, kind?: 'info' | 'error'): void;
 
@@ -83,6 +90,10 @@ interface State {
   removePoi(id: string): void;
   setTakeoffAt(pos: Geodetic): void;
   setAltitudeMode(mode: AltitudeMode): void;
+  /** Change survey parameters (creating the survey if needed) or remove it with undefined. */
+  updateSurvey(patch: Partial<SurveySpec> | undefined, opts?: { history?: boolean }): void;
+  addSurveyVertex(pos: Geodetic): void;
+  moveSurveyVertex(index: number, pos: Geodetic, opts?: { history?: boolean }): void;
 }
 
 export const useStore = create<State>((set, get) => ({
@@ -130,6 +141,9 @@ export const useStore = create<State>((set, get) => ({
       /* storage may be unavailable */
     }
     set({ settings });
+  },
+  setDem(dem) {
+    set({ dem });
   },
   focusMission: () => set((s) => ({ focusToken: s.focusToken + 1 })),
   notify(text, kind = 'info') {
@@ -223,7 +237,43 @@ export const useStore = create<State>((set, get) => ({
   setAltitudeMode(mode) {
     get().setMission((m) => changeAltitudeMode(m, mode));
   },
+  updateSurvey(patch, opts) {
+    get().setMission(
+      (m) => ({
+        ...m,
+        survey: patch && { ...DEFAULT_SURVEY, polygon: [], ...m.survey, ...patch },
+      }),
+      opts,
+    );
+  },
+  addSurveyVertex(pos) {
+    const polygon = get().mission.survey?.polygon ?? [];
+    get().updateSurvey({ polygon: [...polygon, { lat: pos.lat, lon: pos.lon }] });
+  },
+  moveSurveyVertex(index, pos, opts) {
+    const polygon = [...(get().mission.survey?.polygon ?? [])];
+    if (!polygon[index]) return;
+    polygon[index] = { lat: pos.lat, lon: pos.lon };
+    get().updateSurvey({ polygon }, opts);
+  },
 }));
+
+/** Decode the stored GeoTIFF and apply the configured offset. */
+export async function loadDem(offset = useStore.getState().settings.demOffset) {
+  const data = await loadDemFile();
+  if (!data) return undefined;
+  return new Dem(await readGeoTiffDem(data), offset);
+}
+
+// Restore the GeoTIFF terrain from the last session.
+if (useStore.getState().settings.terrain === 'geotiff') {
+  loadDem()
+    .then((dem) => {
+      if (dem) useStore.getState().setDem(dem);
+      else throw new Error('the DEM file is missing; load it again in Map data.');
+    })
+    .catch((e) => useStore.getState().notify(`GeoTIFF terrain: ${e.message ?? e}`, 'error'));
+}
 
 // Autosave so a crash or reload never loses a plan.
 let saveTimer: ReturnType<typeof setTimeout> | undefined;

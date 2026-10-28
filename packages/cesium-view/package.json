@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@odc/core": "0.1.0",
-    "cesium": "^1.146.0"
+    "cesium": "^1.146.0",
+    "geotiff": "^2.1.3"
   }
 }

@@ -6,11 +6,12 @@
             └───────────────┬───────────────────────────────┬─────────────────────────────────┘
                             │                               │
                  @odc/cesium-view                   @odc/exporters
-         MissionScene · PovView · sources      Litchi CSV · DJI WPML/KMZ
+   MissionScene · PovView · sources · DEM     Litchi CSV · DJI WPML/KMZ · MAVLink · importers
                             │                               │
                             └──────────────┬────────────────┘
                                       @odc/core
-        geo (WGS84/ENU) · mission model · path (spline + timing) · camera · profiles · safety · templates
+   geo (WGS84/ENU) · mission model · path (spline + timing) · camera · profiles · safety · templates
+                              survey (grid + GSD) · dem (UTM, bilinear heights)
 ```
 
 ## Core ideas
@@ -22,6 +23,12 @@
 - **Camera:** each waypoint resolves a yaw and pitch at the current position (along path, toward a POI, or fixed). The two ends of a leg are blended with smoothstep along the shortest yaw arc. POI tracking is evaluated continuously, not only at waypoints.
 
 **Heights.** Waypoints store `alt` in the mission's altitude mode plus the `groundHeight` captured when they were placed. `waypointHeight()` resolves the absolute ellipsoid height. Changing the mode re-expresses the values without moving anything.
+
+**Surveys are just waypoints.** `planSurvey()` lays out a serpentine over the outline in a local ENU frame rotated to the line angle, intersecting each line with the polygon (so concave outlines give several segments per line). Line ends carry a `photoDistance` action that starts or stops distance-triggered photos. `surveyWaypoints()` then places the points at the survey height above the sampled ground. Because the result is an ordinary waypoint list, the preview, safety checks and every exporter work unchanged; the spec is kept on `mission.survey` so the outline can be edited and regenerated.
+
+**Terrain from a GeoTIFF.** `readGeoTiffDem()` (cesium-view, using geotiff.js) decodes the raster into a `DemGrid`; `Dem` in core does the CRS maths and bilinear lookups. The same object feeds a `CustomHeightmapTerrainProvider` for display and `MissionScene.sampleGround()` directly, so safety checks read the raster rather than whatever tiles are loaded. The raw file is kept in IndexedDB and decoded again at startup.
+
+**Imports.** Each importer turns a file into an `ImportedPlan` (positions, heights in the file's own reference, POIs, actions) without knowing the ground. The app samples ground heights and `importedToMission()` builds the mission. Round-trip tests export every format, import it again and compare positions and actions.
 
 **No Cesium in core.** `core` and `exporters` are plain TypeScript and are tested in Node. Cesium is confined to `cesium-view`, which provides:
 
