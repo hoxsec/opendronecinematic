@@ -7,9 +7,12 @@ import {
   type PointOfInterest,
   type Waypoint,
 } from './mission';
+import { clamp } from './camera';
+import { focalRange, missionProfile } from './profiles';
 
 /** A cinematic move generated around a subject. */
-export type ShotTemplate = 'orbit' | 'helix' | 'reveal' | 'dolly' | 'flyby' | 'dronie';
+export type ShotTemplate =
+  'orbit' | 'helix' | 'reveal' | 'dolly' | 'flyby' | 'dronie' | 'dollyzoom';
 
 export interface ShotParams {
   /** The subject. Its height is the point the camera looks at. */
@@ -27,6 +30,10 @@ export interface ShotParams {
   /** For helix/dronie: metres climbed over the shot. */
   climb?: number;
   speed?: number;
+  /** For dollyzoom: back away while zooming in, or push in while zooming out. */
+  dollyZoom?: 'pull-out' | 'push-in';
+  /** For dollyzoom: far distance over near distance, also the zoom ratio. Capped by the lens. */
+  zoomRatio?: number;
 }
 
 export interface ShotResult {
@@ -60,6 +67,12 @@ export const SHOT_TEMPLATES: { id: ShotTemplate; name: string; description: stri
     id: 'dronie',
     name: 'Dronie / pull-back',
     description: 'Start close and pull away while climbing, keeping the subject framed.',
+  },
+  {
+    id: 'dollyzoom',
+    name: 'Dolly zoom (vertigo)',
+    description:
+      'Move toward or away from the subject while zooming the other way, so it keeps its size while the background stretches or squeezes.',
   },
 ];
 
@@ -149,6 +162,20 @@ export function generateShot(mission: Mission, kind: ShotTemplate, p: ShotParams
         wp(at(b0, r * 0.6, h * 0.2 + climb * 0.4)),
         wp(at(b0, r * 1.2, h * 0.2 + climb)),
       ];
+      break;
+    }
+    case 'dollyzoom': {
+      // Starts at the main focal length (pull-out) or zoomed in (push-in); the zoomLock legs
+      // then scale the focal length with the distance to the subject.
+      const [fMin, fMax] = focalRange(missionProfile(mission));
+      const ratio = clamp(p.zoomRatio ?? 3, 1, fMax / fMin);
+      const pull = p.dollyZoom !== 'push-in';
+      const [d0, d1] = pull ? [r, r * ratio] : [r * ratio, r];
+      const dh = p.groundHeight + h - poi.height;
+      const start = pull ? fMin : (fMin * Math.hypot(r * ratio, dh)) / Math.hypot(r, dh);
+      waypoints = [0, 0.5, 1].map((f, i) =>
+        wp(at(b0, d0 + (d1 - d0) * f, h), i === 0 ? { focalMm: start } : { zoomLock: true }),
+      );
       break;
     }
   }

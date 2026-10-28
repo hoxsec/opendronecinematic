@@ -3,6 +3,7 @@ import {
   evaluateSafety,
   waypointHeight,
   altFromHeight,
+  profileFov,
   AIRFIELD_RADIUS,
   type Obstacle,
 } from '@odc/core';
@@ -152,8 +153,10 @@ export function GlobeView() {
   useEffect(() => {
     // In fly mode the fly controller drives the drone marker instead of the timeline.
     if (fly) return;
-    sceneRef.current?.setDrone(path.sample(time), fov.horizontal, profile.videoAspect);
-  }, [fly, path, time, fov.horizontal, profile.videoAspect]);
+    const s = path.sample(time);
+    const hFov = s ? profileFov(profile, 'video', s.focalMm).horizontal : fov.horizontal;
+    sceneRef.current?.setDrone(s, hFov, profile.videoAspect);
+  }, [fly, path, time, fov.horizontal, profile]);
 
   useEffect(() => {
     if (focusToken === 0) return;

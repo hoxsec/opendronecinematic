@@ -791,6 +791,33 @@ input[type='range'] {
   bottom: 0;
   height: 16px;
 }
+.timeline .zoom-marks {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: -2px;
+  height: 0;
+}
+.timeline .zoom-marks span {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 9px;
+  line-height: 10px;
+  padding: 0 3px;
+  border-radius: 3px;
+  white-space: nowrap;
+}
+.timeline .zoom-marks .lens {
+  background: var(--warn);
+  color: #111;
+}
+.timeline .zoom-marks .digital {
+  width: 2px;
+  height: 10px;
+  padding: 0;
+  background: var(--warn);
+  opacity: 0.6;
+}
 .timeline .tick {
   position: absolute;
   transform: translateX(-50%);
@@ -966,4 +993,97 @@ input[type='range'] {
   margin: 0 0 6px;
   padding-left: 16px;
   color: var(--muted);
+}
+
+.zoom-editor input[type='range'] {
+  width: 100%;
+}
+.zoom-info {
+  align-self: end;
+  padding-bottom: 6px;
+}
+
+/* Framing guides over the camera frame (HTML only, never in renders). */
+.frame-guides {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.frame-guides .letterbox {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.85);
+}
+.frame-guides .crop-dim {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+.frame-guides .crop-outline {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 1px solid var(--accent);
+}
+.frame-guides .crop-outline::after {
+  content: attr(data-label);
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  font-size: 10px;
+  color: var(--accent);
+}
+.frame-guides .safe {
+  position: absolute;
+  border: 1px dashed rgba(255, 255, 255, 0.45);
+}
+.frame-guides .safe.action {
+  inset: 3.5%;
+}
+.frame-guides .safe.title {
+  inset: 5%;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.frame-guides .centre-cross {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.6)) center / 1px 100% no-repeat,
+    linear-gradient(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.6)) center / 100% 1px no-repeat;
+}
+.frame-guides .horizon {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px dashed var(--poi);
+}
+.guides-menu {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  z-index: 4;
+}
+.guides-menu > button {
+  font-size: 11px;
+  padding: 2px 8px;
+  background: rgba(15, 23, 42, 0.8);
+}
+.guides-pop {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 6px);
+  display: grid;
+  gap: 6px;
+  width: 170px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
 }

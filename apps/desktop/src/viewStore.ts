@@ -58,6 +58,18 @@ export interface ZoomPrefs {
   snappy: boolean;
 }
 
+/** Overlays on the camera frame. They are never drawn into renders. */
+export interface FrameGuides {
+  /** Letterbox mask for a wider delivery aspect. */
+  cinema: 'none' | '2.39' | '1.85';
+  /** Outline of a narrower crop for reframing the same shot. */
+  social: 'none' | '9:16' | '4:5';
+  /** Action-safe and title-safe frames with a centre cross. */
+  safe: boolean;
+  /** Where the true horizon sits in frame. */
+  horizon: boolean;
+}
+
 interface LayoutPrefs {
   main: MainView;
   mini: MiniRect;
@@ -68,6 +80,7 @@ interface LayoutPrefs {
   zoom: ZoomPrefs;
   /** Sun shadows in the camera view and renders. */
   shadows: boolean;
+  guides: FrameGuides;
 }
 
 const LAYOUT_KEY = 'odc.layout.v1';
@@ -79,6 +92,7 @@ const DEFAULT_LAYOUT: LayoutPrefs = {
   split: 0.5,
   zoom: { speed: 1, snappy: false },
   shadows: true,
+  guides: { cinema: 'none', social: 'none', safe: false, horizon: false },
 };
 
 function loadLayout(): LayoutPrefs {
@@ -108,6 +122,7 @@ interface ViewState extends LayoutPrefs {
   setSplit(split: number): void;
   setZoom(zoom: Partial<ZoomPrefs>): void;
   setShadows(shadows: boolean): void;
+  setGuides(guides: Partial<FrameGuides>): void;
   setFly(fly: boolean): void;
   setFlyHud(hud?: FlyHud): void;
   setRender(render?: RenderProgress): void;
@@ -131,6 +146,7 @@ export const useView = create<ViewState>((set, get) => ({
   setSplit: (split) => set({ split: Math.max(0.2, Math.min(0.8, split)) }),
   setZoom: (zoom) => set((s) => ({ zoom: { ...s.zoom, ...zoom } })),
   setShadows: (shadows) => set({ shadows }),
+  setGuides: (guides) => set((s) => ({ guides: { ...s.guides, ...guides } })),
   setFly(fly) {
     // Flying happens through the camera, so it always takes the main screen.
     set(fly ? { fly, main: 'camera', activeTakeId: undefined } : { fly, flyHud: undefined });

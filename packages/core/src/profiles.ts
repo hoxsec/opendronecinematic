@@ -21,6 +21,13 @@ export interface DroneProfile {
   family: DroneFamily;
   /** 35mm-equivalent focal length of the main camera. */
   equivalentFocalMm: number;
+  /**
+   * 35mm-equivalent focal lengths of the physical cameras, widest first, on drones with more
+   * than one. Zooming past one switches to it, which shows as a jump in real footage.
+   */
+  lenses?: number[];
+  /** Longest 35mm-equivalent focal length in video, digital zoom included. Default: 2x main. */
+  maxFocalMm?: number;
   /** Physical sensor size, used for ground-sample-distance maths. */
   sensorWidthMm: number;
   sensorHeightMm: number;
@@ -152,6 +159,7 @@ export const DRONE_PROFILES: DroneProfile[] = [
   drone('dji-mini-4-pro', 'DJI Mini 4 Pro', 'dji-consumer', {
     camera: CAM['1/1.3in 48MP'],
     equivalentFocalMm: 24,
+    maxFocalMm: 96,
     maxSpeed: 16,
     maxAscentSpeed: 5,
     maxDescentSpeed: 4,
@@ -247,6 +255,8 @@ export const DRONE_PROFILES: DroneProfile[] = [
   drone('dji-air-3', 'DJI Air 3 (wide)', 'dji-consumer', {
     camera: CAM['1/1.3in 48MP'],
     equivalentFocalMm: 24,
+    lenses: [24, 70],
+    maxFocalMm: 210,
     maxSpeed: 21,
     maxAscentSpeed: 10,
     maxDescentSpeed: 10,
@@ -259,6 +269,8 @@ export const DRONE_PROFILES: DroneProfile[] = [
   drone('dji-air-3s', 'DJI Air 3S (wide)', 'dji-consumer', {
     camera: CAM['1in 50MP'],
     equivalentFocalMm: 24,
+    lenses: [24, 70],
+    maxFocalMm: 210,
     maxSpeed: 21,
     maxAscentSpeed: 10,
     maxDescentSpeed: 10,
@@ -282,6 +294,8 @@ export const DRONE_PROFILES: DroneProfile[] = [
   drone('dji-mavic-3-pro', 'DJI Mavic 3 Pro (Hasselblad)', 'dji-consumer', {
     camera: CAM['4/3 20MP'],
     equivalentFocalMm: 24,
+    lenses: [24, 70, 166],
+    maxFocalMm: 672,
     maxSpeed: 21,
     maxAscentSpeed: 8,
     maxDescentSpeed: 6,
@@ -294,6 +308,8 @@ export const DRONE_PROFILES: DroneProfile[] = [
   drone('dji-mavic-4-pro', 'DJI Mavic 4 Pro (Hasselblad)', 'dji-consumer', {
     camera: [17.3, 11.5, 12288, 8192],
     equivalentFocalMm: 28,
+    lenses: [28, 70, 168],
+    maxFocalMm: 672,
     maxSpeed: 25,
     maxAscentSpeed: 8,
     maxDescentSpeed: 6,
@@ -724,10 +740,35 @@ export function fovFromEquivalentFocal(
   return { horizontal: fov(w), vertical: fov(h), diagonal: fov(Math.hypot(w, h)) };
 }
 
-export function profileFov(profile: DroneProfile, frame: 'video' | 'photo' = 'video') {
+/** Shortest and longest 35mm-equivalent focal length the drone can shoot video at. */
+export function focalRange(profile: DroneProfile): [number, number] {
+  const min = profile.equivalentFocalMm;
+  return [min, Math.max(min, profile.maxFocalMm ?? min * 2)];
+}
+
+/**
+ * Which physical camera a focal length uses (the longest lens not longer than it) and how much
+ * digital zoom on top, 1 meaning none.
+ */
+export function lensAt(
+  profile: DroneProfile,
+  focalMm: number,
+): { lensMm: number; digital: number } {
+  const lenses = profile.lenses ?? [profile.equivalentFocalMm];
+  let lensMm = lenses[0]!;
+  for (const l of lenses) if (l <= focalMm * 1.001) lensMm = l;
+  return { lensMm, digital: Math.max(1, focalMm / lensMm) };
+}
+
+/** Field of view of the profile's camera, at its main focal length or the one given. */
+export function profileFov(
+  profile: DroneProfile,
+  frame: 'video' | 'photo' = 'video',
+  focalMm = profile.equivalentFocalMm,
+) {
   const sensorAspect = profile.sensorWidthMm / profile.sensorHeightMm;
   return fovFromEquivalentFocal(
-    profile.equivalentFocalMm,
+    focalMm,
     sensorAspect,
     frame === 'video' ? profile.videoAspect : sensorAspect,
   );
