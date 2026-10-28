@@ -379,7 +379,12 @@ export class MissionScene {
   groundHeightAt(lat: number, lon: number): number | undefined {
     const { scene } = this.viewer;
     const c = Cartographic.fromDegrees(lon, lat);
-    let h = this.dem?.heightAt(lat, lon) ?? scene.globe.getHeight(c);
+    // Outside the DEM (or without terrain) the globe is a flat 0 m; that's no ground reading.
+    let h = this.dem
+      ? this.dem.heightAt(lat, lon)
+      : scene.terrainProvider instanceof EllipsoidTerrainProvider
+        ? undefined
+        : scene.globe.getHeight(c);
     const higher = (t: number | undefined) => {
       if (t !== undefined && !Number.isNaN(t)) h = h === undefined ? t : Math.max(h, t);
     };
@@ -404,8 +409,10 @@ export class MissionScene {
   ) {
     this.mission = mission;
     const ents = this.missionLayer.entities;
-    ents.suspendEvents();
+    // Remove before suspending: a remove and re-add of the same id in one batch cancels out, and
+    // the visualizers would keep drawing the old entity at its old position.
     ents.removeAll();
+    ents.suspendEvents();
 
     const outline = mission.survey?.polygon ?? [];
     if (outline.length >= 3) {
