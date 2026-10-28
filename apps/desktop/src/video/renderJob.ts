@@ -1,6 +1,6 @@
 import { missionProfile, newId, profileFov } from '@odc/core';
 import { OfflineRenderer } from '@odc/cesium-view';
-import { getPath } from '../derived';
+import { getPath, sunTimeAt } from '../derived';
 import { useStore } from '../store';
 import { useView, type VideoFormat } from '../viewStore';
 import { createEncoder, type VideoQuality } from './encoders';
@@ -53,14 +53,16 @@ export async function renderFlight(req: RenderRequest) {
       horizontalFovDeg: fov,
       settings,
       dem,
+      shadows: view.shadows,
     });
     encoder = await createEncoder(req.format, renderer.canvas, {
       fps: req.fps,
       quality: req.quality,
     });
     for (let i = 0; i < total; i++) {
-      const sample = path.sample(i / req.fps)!;
-      const complete = await renderer.renderFrame(sample, controller.signal);
+      const t = i / req.fps;
+      const sample = path.sample(t)!;
+      const complete = await renderer.renderFrame(sample, sunTimeAt(mission, t), controller.signal);
       if (!complete) progress.slowFrames++;
       await encoder.addFrame(i);
       progress.frame = i + 1;

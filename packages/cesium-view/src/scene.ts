@@ -45,6 +45,7 @@ import {
 } from './sources';
 import { sampleTerrainHeights } from './terrain';
 import { applyPose, type CameraPose } from './pose';
+import { applySunLight } from './lighting';
 
 export type PickTarget =
   | { kind: 'waypoint' | 'poi'; id: string }
@@ -171,6 +172,14 @@ export class MissionScene {
     });
     this.sourcesQueue = run.catch(() => {});
     return run;
+  }
+
+  /**
+   * Light the map by the sun at `time`. No shadows: at planning distances the shadow map aliases
+   * into stripes on photogrammetry; the camera view and renders draw them.
+   */
+  setSun(time: Date) {
+    applySunLight(this.viewer.scene, this.viewer.clock, time, false);
   }
 
   /**

@@ -1,9 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fmtTime, horizontalSpeed, waypointHeight } from '@odc/core';
+import {
+  fmtTime,
+  horizontalSpeed,
+  sunInFrame,
+  sunPosition,
+  sunRelation,
+  waypointHeight,
+  type SunRelation,
+} from '@odc/core';
 import { PovView } from '@odc/cesium-view';
 import { useStore } from '../store';
 import { useView, type Take } from '../viewStore';
-import { useCamera, usePath } from '../derived';
+import { useCamera, usePath, useSunTime } from '../derived';
 import { useFlyController } from '../fly/useFlyController';
 import { KEY_HELP, PAD_HELP } from '../fly/input';
 import { saveFile } from '../platform';
@@ -22,6 +30,8 @@ export function CameraView({ isMain }: { isMain: boolean }) {
   const compare = useView((s) => s.compare);
   const rendering = useView((s) => !!s.render);
   const take = useView((s) => s.takes.find((t) => t.id === s.activeTakeId));
+  const shadows = useView((s) => s.shadows);
+  const sunTime = useSunTime().getTime();
   const path = usePath();
   const { fov, profile } = useCamera();
   const getPov = useCallback(() => povRef.current, []);
@@ -40,6 +50,10 @@ export function CameraView({ isMain }: { isMain: boolean }) {
   useEffect(() => {
     povRef.current?.setSources(settings, dem);
   }, [settings, dem]);
+
+  useEffect(() => {
+    povRef.current?.setSun(new Date(sunTime), shadows);
+  }, [sunTime, shadows]);
 
   useEffect(() => {
     if (fly) return;
@@ -79,6 +93,28 @@ export function CameraView({ isMain }: { isMain: boolean }) {
   );
 }
 
+const SUN_SHORT: Record<SunRelation, string> = {
+  backlit: 'BACKLIT',
+  'front-lit': 'FRONT',
+  'side-left': 'SIDE L',
+  'side-right': 'SIDE R',
+};
+
+/** Sun elevation and where it falls on the frame; warns when the sun is in shot. */
+function SunHud({ yaw, pitch }: { yaw: number; pitch: number }) {
+  const mission = useStore((s) => s.mission);
+  const sunTime = useSunTime();
+  const { fov } = useCamera();
+  const sun = sunPosition(sunTime, mission.takeoff.lat, mission.takeoff.lon);
+  if (sun.elevation < -6) return <span>SUN ☾</span>;
+  const inFrame = sunInFrame(yaw, pitch, fov.horizontal, fov.vertical, sun);
+  return (
+    <span className={inFrame ? 'warn' : ''} title="Sun elevation and lighting on the frame">
+      SUN {sun.elevation.toFixed(0)}° {inFrame ? 'IN FRAME' : SUN_SHORT[sunRelation(yaw, sun)]}
+    </span>
+  );
+}
+
 function PlanHud() {
   const time = useStore((s) => s.time);
   const mission = useStore((s) => s.mission);
@@ -103,6 +139,7 @@ function PlanHud() {
       {ground !== undefined && <span>AGL {(s.position.height - ground).toFixed(0)} m</span>}
       <span>D {home.toFixed(0)} m</span>
       <span>FOV {fov.horizontal.toFixed(0)}°</span>
+      <SunHud yaw={s.yaw} pitch={s.pitch} />
       <span className="right">
         {fmtTime(time)} / {fmtTime(path.duration)}
       </span>
@@ -133,6 +170,7 @@ function FlyHud() {
         {agl !== undefined && (
           <span className={agl > 120 ? 'warn' : ''}>AGL {agl.toFixed(0)} m</span>
         )}
+        <SunHud yaw={s.yaw} pitch={s.pitch} />
         {hud.recordingPath && <span className="rec">● PATH {fmtTime(hud.pathSeconds)}</span>}
         <span className="right">
           {mission.waypoints.length} WP · {mission.pois.length} POI

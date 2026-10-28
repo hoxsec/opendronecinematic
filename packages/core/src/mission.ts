@@ -66,6 +66,14 @@ export interface MissionSettings {
   finishAction: 'hover' | 'returnHome' | 'land';
 }
 
+/** When the shoot is planned, for sun position and lighting. */
+export interface ShootTime {
+  /** Takeoff moment, ISO 8601 in UTC. */
+  start: string;
+  /** Minutes the shoot location's clock is ahead of UTC, for showing local times. */
+  utcOffset: number;
+}
+
 /** User overrides for the 'custom' drone profile. */
 export interface CustomProfileOverrides {
   equivalentFocalMm?: number;
@@ -86,6 +94,8 @@ export interface Mission {
   settings: MissionSettings;
   /** Mapping area and grid parameters, when the mission is (or was generated as) a survey. */
   survey?: SurveySpec;
+  /** Planned shoot time; unset means today's evening golden hour. */
+  shoot?: ShootTime;
 }
 
 export const DEFAULT_SETTINGS: MissionSettings = {

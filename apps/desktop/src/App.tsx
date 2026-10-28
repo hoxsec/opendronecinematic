@@ -5,6 +5,7 @@ import { Toolbar } from './components/Toolbar';
 import { Workspace } from './components/Workspace';
 import { Timeline } from './components/Timeline';
 import { MissionPanel } from './components/MissionPanel';
+import { SunPanel } from './components/SunPanel';
 import { WaypointPanel } from './components/WaypointPanel';
 import { PoiPanel } from './components/PoiPanel';
 import { ShotPanel } from './components/ShotPanel';
@@ -97,6 +98,7 @@ export function App() {
           </div>
         )}
         <MissionPanel />
+        <SunPanel />
         <WaypointPanel />
         <PoiPanel />
         <ShotPanel />

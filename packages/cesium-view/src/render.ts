@@ -11,6 +11,7 @@ import type { Dem } from '@odc/core';
 import type { LocalBuildings } from './localBuildings';
 import { applySources, type DataSourceSettings } from './sources';
 import { applyPose, type CameraPose } from './pose';
+import { applySunLight } from './lighting';
 
 // Fires whenever any Cesium network request completes. Public at runtime but missing from the
 // typings, so it is accessed defensively; without it the renderer falls back to polling.
@@ -26,6 +27,8 @@ export interface OfflineRendererOptions {
   dem?: Dem;
   /** Give up waiting for tiles on a frame after this long and render what is loaded. */
   tileTimeoutMs?: number;
+  /** Render shadows; frames are lit by the sun at the time passed to renderFrame. */
+  shadows?: boolean;
 }
 
 /**
@@ -106,9 +109,13 @@ export class OfflineRenderer {
     );
   }
 
-  /** Render one frame at the pose, waiting for tiles. Returns false if it timed out waiting. */
-  async renderFrame(pose: CameraPose, signal?: AbortSignal): Promise<boolean> {
+  /**
+   * Render one frame at the pose, lit by the sun at `time`, waiting for tiles. Returns false if
+   * it timed out waiting.
+   */
+  async renderFrame(pose: CameraPose, time: Date, signal?: AbortSignal): Promise<boolean> {
     applyPose(this.widget.camera, pose);
+    applySunLight(this.widget.scene, this.widget.clock, time, this.opts.shadows ?? false);
     const start = performance.now();
     let stable = 0;
     // Tile requests are only issued during render, so keep rendering until two loaded frames

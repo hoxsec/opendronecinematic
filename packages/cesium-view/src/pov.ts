@@ -10,6 +10,7 @@ import {
 import type { Dem, Geodetic } from '@odc/core';
 import { applySources, type AppliedSources, type DataSourceSettings } from './sources';
 import { applyPose, type CameraPose } from './pose';
+import { applySunLight } from './lighting';
 
 /**
  * A second globe that renders exactly what the drone camera sees: same world, camera placed at
@@ -55,6 +56,11 @@ export class PovView {
     frustum.fov = CMath.toRadians(horizontalFovDeg);
     frustum.near = 0.5;
     applyPose(this.widget.camera, pose);
+  }
+
+  /** Light the view by the sun at `time`, with or without shadows. */
+  setSun(time: Date, shadows: boolean) {
+    applySunLight(this.widget.scene, this.widget.clock, time, shadows);
   }
 
   /** What the centre crosshair is pointing at: terrain or 3D tiles. */

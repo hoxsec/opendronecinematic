@@ -66,6 +66,8 @@ interface LayoutPrefs {
   /** Share of the area taken by the first (main) view in split layout, 0..1. */
   split: number;
   zoom: ZoomPrefs;
+  /** Sun shadows in the camera view and renders. */
+  shadows: boolean;
 }
 
 const LAYOUT_KEY = 'odc.layout.v1';
@@ -76,6 +78,7 @@ const DEFAULT_LAYOUT: LayoutPrefs = {
   splitDir: 'row',
   split: 0.5,
   zoom: { speed: 1, snappy: false },
+  shadows: true,
 };
 
 function loadLayout(): LayoutPrefs {
@@ -104,6 +107,7 @@ interface ViewState extends LayoutPrefs {
   setSplitDir(splitDir: SplitDir): void;
   setSplit(split: number): void;
   setZoom(zoom: Partial<ZoomPrefs>): void;
+  setShadows(shadows: boolean): void;
   setFly(fly: boolean): void;
   setFlyHud(hud?: FlyHud): void;
   setRender(render?: RenderProgress): void;
@@ -126,6 +130,7 @@ export const useView = create<ViewState>((set, get) => ({
   setSplitDir: (splitDir) => set({ splitDir }),
   setSplit: (split) => set({ split: Math.max(0.2, Math.min(0.8, split)) }),
   setZoom: (zoom) => set((s) => ({ zoom: { ...s.zoom, ...zoom } })),
+  setShadows: (shadows) => set({ shadows }),
   setFly(fly) {
     // Flying happens through the camera, so it always takes the main screen.
     set(fly ? { fly, main: 'camera', activeTakeId: undefined } : { fly, flyHud: undefined });
