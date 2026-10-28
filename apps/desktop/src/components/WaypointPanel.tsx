@@ -1,6 +1,13 @@
-import type { GimbalMode, HeadingMode, Waypoint, WaypointAction } from '@odc/core';
+import {
+  focalRange,
+  lensAt,
+  type GimbalMode,
+  type HeadingMode,
+  type Waypoint,
+  type WaypointAction,
+} from '@odc/core';
 import { useStore } from '../store';
-import { usePath } from '../derived';
+import { useCamera, usePath } from '../derived';
 import { Field, NumberInput, Section, Select } from './fields';
 
 const HEADINGS: { value: HeadingMode; label: string }[] = [
@@ -174,6 +181,7 @@ function WaypointEditor({ wp, index }: { wp: Waypoint; index: number }) {
           Add a POI for this waypoint to face; until then it behaves as “along path”.
         </p>
       )}
+      <ZoomEditor wp={wp} index={index} up={up} />
       <div className="grid2">
         <Field label="Hover">
           <NumberInput
@@ -216,6 +224,92 @@ function WaypointEditor({ wp, index }: { wp: Waypoint; index: number }) {
           <input type="checkbox" checked={has('photo')} onChange={() => toggle('photo')} /> Photo
         </label>
       </div>
+    </div>
+  );
+}
+
+/** Focal length at a waypoint: typed, slid (log scale), a lens preset, or locked to the subject. */
+function ZoomEditor({
+  wp,
+  index,
+  up,
+}: {
+  wp: Waypoint;
+  index: number;
+  up: (patch: Partial<Waypoint>) => void;
+}) {
+  const mission = useStore((s) => s.mission);
+  const path = usePath();
+  const { profile } = useCamera();
+  const [fMin, fMax] = focalRange(profile);
+  const arrive = path.timings[index]?.arrive;
+  const actual = arrive === undefined ? undefined : path.sample(arrive)?.focalMm;
+  const focal = wp.zoomLock ? (actual ?? fMin) : (wp.focalMm ?? fMin);
+  const lens = lensAt(profile, focal);
+  const canLock = index > 0 && mission.pois.length > 0;
+  const toT = (mm: number) => Math.log(mm / fMin) / Math.log(fMax / fMin);
+  const fromT = (t: number) => Math.round(fMin * (fMax / fMin) ** t);
+
+  return (
+    <div className="zoom-editor">
+      <div className="grid2">
+        <Field
+          label="Zoom"
+          hint={`35mm-equivalent focal length, ${fMin}-${fMax} mm on this drone. Eases from the previous waypoint.`}
+        >
+          <NumberInput
+            value={Math.round(focal)}
+            min={fMin}
+            max={fMax}
+            suffix="mm"
+            onChange={(focalMm) => up({ focalMm, zoomLock: false })}
+          />
+        </Field>
+        <span className="muted small zoom-info">
+          {(focal / fMin).toFixed(1)}× ·{' '}
+          {lens.digital > 1.01
+            ? `${lens.lensMm} mm + ${lens.digital.toFixed(1)}× digital`
+            : `${lens.lensMm} mm lens`}
+        </span>
+      </div>
+      {fMax > fMin && (
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.005}
+          value={toT(focal)}
+          disabled={wp.zoomLock}
+          onChange={(e) => up({ focalMm: fromT(Number(e.target.value)), zoomLock: false })}
+          aria-label="Zoom"
+        />
+      )}
+      {(profile.lenses?.length ?? 0) > 1 && (
+        <div className="button-row">
+          {profile.lenses!.map((mm) => (
+            <button
+              key={mm}
+              className={!wp.zoomLock && Math.round(focal) === mm ? 'active' : ''}
+              onClick={() => up({ focalMm: mm, zoomLock: false })}
+            >
+              {mm} mm
+            </button>
+          ))}
+        </div>
+      )}
+      {canLock && (
+        <label
+          className="check"
+          title="Zoom on the way here so the POI keeps the size it had at the last waypoint without this: a dolly zoom"
+        >
+          <input
+            type="checkbox"
+            checked={!!wp.zoomLock}
+            onChange={(e) => up({ zoomLock: e.target.checked })}
+          />
+          Keep subject size (dolly zoom)
+        </label>
+      )}
     </div>
   );
 }

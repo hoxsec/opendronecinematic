@@ -47,6 +47,9 @@ const FILES: Record<Format, { ext: string; name: string }> = {
 export function ExportDialog({ onClose }: { onClose: () => void }) {
   const mission = useStore((s) => s.mission);
   const profile = missionProfile(mission);
+  const zoomed = mission.waypoints.some(
+    (w) => w.zoomLock || (w.focalMm !== undefined && w.focalMm !== profile.equivalentFocalMm),
+  );
   const [format, setFormat] = useState<Format>(profile.exportFormats[0] ?? 'litchi');
   const [densify, setDensify] = useState(false);
   const [spacing, setSpacing] = useState(10);
@@ -116,6 +119,12 @@ export function ExportDialog({ onClose }: { onClose: () => void }) {
         )}
         {unsupported && (
           <p className="note">{profile.name} is not usually flown with this format.</p>
+        )}
+        {zoomed && (
+          <p className="note">
+            Zoom is preview-only: the exported mission keeps the {profile.equivalentFocalMm} mm main
+            camera. Set the zoom on the remote during the flight.
+          </p>
         )}
         {preview.warnings.length > 0 && (
           <ul className="issues">

@@ -41,6 +41,13 @@ export interface Waypoint {
   gimbalPitch?: number;
   /** POI used by heading/gimbal 'poi' modes; falls back to the mission's first POI. */
   poiId?: string;
+  /** 35mm-equivalent focal length (zoom); unset means the main camera's. Eases between waypoints. */
+  focalMm?: number;
+  /**
+   * Zoom on the leg into this waypoint so the POI keeps the size it had at the last waypoint
+   * without zoomLock: the dolly zoom. `focalMm` is ignored.
+   */
+  zoomLock?: boolean;
   actions: WaypointAction[];
 }
 

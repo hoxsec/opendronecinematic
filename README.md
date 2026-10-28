@@ -47,6 +47,7 @@
 | 🎯 **Aim the camera exactly**  | Points of interest, heading and gimbal modes per waypoint, smooth easing between them.                                      |
 | 🎥 **See what the drone sees** | A live camera view using the drone's real field of view. Swap it with the map at any time.                                  |
 | ☀️ **Sun and golden hour**     | Real sun lighting and shadows for the shoot date and time, golden and blue hour on a day strip, and the light on your shot. |
+| 🔭 **Zoom and dolly zoom**     | Per-waypoint focal length with real lens data, lens-switch and digital-zoom marks, a vertigo template and framing guides.   |
 | 🕹️ **Fly mode**                | Fly a simulated drone with keyboard, mouse or gamepad. Drop waypoints, mark POIs, or record a flight path.                  |
 | 🎬 **Shot templates**          | Orbit, helix, reveal, dolly, fly-by and dronie, generated around a subject in one click.                                    |
 | 🗺️ **Survey grids**            | Draw an area, set height and overlap, get a lawnmower grid with GSD, photo count and distance-triggered photos.             |
@@ -113,6 +114,18 @@ The **camera view** renders exactly what the drone camera will record. It uses t
 - Press **L** or **▣ Mini-screen / ◫ Split** to show the map and camera side by side. **⬌ / ⬍** stacks them instead; drag the divider to resize, double-click it to centre.
 - **🔍** sets the map's mouse-wheel zoom speed (slow, normal, fast or anything between), and **Snappy** stops the zoom as soon as the wheel stops.
 - Press **Space** or ▶ to play the flight, and scrub the timeline. The numbered ticks on the timeline jump to each waypoint.
+
+#### Zoom, dolly zoom and framing guides
+
+Each waypoint has a **Zoom** (35mm-equivalent focal length). The zoom eases between waypoints, and the camera view, map frustum and renders all follow it. Drones with several cameras (Air 3/3S, Mavic 3 Pro, Mavic 4 Pro) have lens presets. Other drones get 2× digital zoom.
+
+- The HUD shows the focal length, and **DIGITAL n×** when the real drone would be zooming digitally on one of its cameras.
+- Orange marks on the timeline show where the drone would **switch cameras**, which shows as a jump in real footage. Thin marks show where digital zoom starts.
+- **Keep subject size (dolly zoom)** on a waypoint zooms on the way there so the POI stays the same size as at the last waypoint without it.
+- The **Dolly zoom (vertigo)** shot template builds the move for you: pull out while zooming in, or push in while zooming out, up to the drone's zoom range.
+- **▦ Guides** in the camera view adds 2.39:1 / 1.85:1 letterbox masks, 9:16 / 4:5 crop outlines, action- and title-safe frames with a centre cross, and the true horizon. Guides never appear in renders.
+
+Zoom is preview-only: exported missions fly on the main camera, and the export dialog says so.
 
 #### Light and time of day
 

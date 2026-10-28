@@ -1,7 +1,7 @@
 import { EnuFrame, lerpAngle, vec, type Geodetic, type Vec3 } from './geo';
 import { clamp, headingOf, lookAt, smoothstep } from './camera';
 import { hoverSeconds, resolvePoi, waypointGeodetic, type Mission, type Waypoint } from './mission';
-import { missionProfile } from './profiles';
+import { focalRange, lensAt, missionProfile, type DroneProfile } from './profiles';
 
 export interface PathSample {
   /** Seconds since the aircraft reached the first waypoint. */
@@ -17,6 +17,8 @@ export interface PathSample {
   yaw: number;
   pitch: number;
   speed: number;
+  /** 35mm-equivalent focal length (zoom). */
+  focalMm: number;
 }
 
 interface Leg {
@@ -158,6 +160,28 @@ export function buildFlightPath(mission: Mission): FlightPath {
     return { yaw, pitch: clamp(pitch, profile.gimbalPitchMin, profile.gimbalPitchMax) };
   };
 
+  // Zoom. A zoomLock waypoint keeps the subject the size it had at its anchor: the last waypoint
+  // without zoomLock (focal length and distance to its POI). Focal length scales with distance.
+  const [fMin, fMax] = focalRange(profile);
+  const focalOf = (wp: Waypoint) => clamp(wp.focalMm ?? profile.equivalentFocalMm, fMin, fMax);
+  type Anchor = { f: number; d: number; poi: Vec3 };
+  const anchors: (Anchor | undefined)[] = [];
+  wps.forEach((wp, i) => {
+    if (wp.zoomLock && i > 0) return anchors.push(anchors[i - 1]);
+    const poi = resolvePoi(mission, wp);
+    const target = poi ? poiEnu.get(poi.id) : undefined;
+    anchors.push(
+      target ? { f: focalOf(wp), d: vec.dist(pts[i]!, target), poi: target } : undefined,
+    );
+  });
+  const lockedFocal = (a: Anchor, pos: Vec3) =>
+    clamp((a.f * vec.dist(pos, a.poi)) / Math.max(a.d, 0.1), fMin, fMax);
+  const locked = (i: number) => (wps[i]!.zoomLock ? anchors[i] : undefined);
+  const focalAtWp = wps.map((wp, i) => {
+    const a = locked(i);
+    return a ? lockedFocal(a, pts[i]!) : focalOf(wp);
+  });
+
   // seg is the waypoint index; u > 0 means "on the leg from seg to seg + 1".
   const make = (time: number, seg: number, u: number, sAbs: number, speed: number): PathSample => {
     let enu: Vec3;
@@ -173,11 +197,15 @@ export function buildFlightPath(mission: Mission): FlightPath {
     }
     const a = orient(wps[seg]!, enu, tangent);
     let { yaw, pitch } = a;
+    let focalMm = focalAtWp[seg]!;
     if (u > 0 && seg + 1 < n) {
       const b = orient(wps[seg + 1]!, enu, tangent);
       const k = smoothstep(u);
       yaw = lerpAngle(a.yaw, b.yaw, k);
       pitch = a.pitch + (b.pitch - a.pitch) * k;
+      const lock = locked(seg + 1);
+      // Ease zoom in log space so each second of a zoom looks equally fast.
+      focalMm = lock ? lockedFocal(lock, enu) : focalMm * (focalAtWp[seg + 1]! / focalMm) ** k;
     }
     return {
       t: time,
@@ -189,6 +217,7 @@ export function buildFlightPath(mission: Mission): FlightPath {
       yaw,
       pitch,
       speed,
+      focalMm,
     };
   };
 
@@ -239,4 +268,28 @@ export function buildFlightPath(mission: Mission): FlightPath {
   };
 
   return { frame, duration, length, timings, sample, sampleEvery, sampleByDistance };
+}
+
+/** A point on the flight where the real camera changes lens or enters or leaves digital zoom. */
+export interface ZoomEvent {
+  t: number;
+  lensMm: number;
+  digital: boolean;
+}
+
+/**
+ * Where the drone would switch cameras or go digital while following the planned zoom. Lens
+ * switches show as a visible jump in real footage; digital zoom softens the picture.
+ */
+export function zoomEvents(path: FlightPath, profile: DroneProfile, dt = 0.1): ZoomEvent[] {
+  const out: ZoomEvent[] = [];
+  let last: { lensMm: number; digital: boolean } | undefined;
+  for (const s of path.sampleEvery(dt)) {
+    const l = lensAt(profile, s.focalMm);
+    const cur = { lensMm: l.lensMm, digital: l.digital > 1.01 };
+    if (last && (cur.lensMm !== last.lensMm || cur.digital !== last.digital))
+      out.push({ t: s.t, ...cur });
+    last = cur;
+  }
+  return out;
 }

@@ -1,6 +1,13 @@
 import { useState } from 'react';
-import { SHOT_TEMPLATES, defaultStartBearing, generateShot, type ShotTemplate } from '@odc/core';
+import {
+  SHOT_TEMPLATES,
+  defaultStartBearing,
+  focalRange,
+  generateShot,
+  type ShotTemplate,
+} from '@odc/core';
 import { useStore } from '../store';
+import { useCamera } from '../derived';
 import { activeScene } from './GlobeView';
 import { Field, NumberInput, Section, Select } from './fields';
 
@@ -13,6 +20,12 @@ export function ShotPanel() {
   const [sweep, setSweep] = useState(360);
   const [climb, setClimb] = useState(40);
   const [bearing, setBearing] = useState<number | undefined>(undefined);
+  const [dollyZoom, setDollyZoom] = useState<'pull-out' | 'push-in'>('pull-out');
+  const [zoomRatio, setZoomRatio] = useState(3);
+  const { profile } = useCamera();
+  const [fMin, fMax] = focalRange(profile);
+  const maxRatio = Math.floor((fMax / fMin) * 10) / 10;
+  const ratio = Math.min(zoomRatio, maxRatio);
   const [busy, setBusy] = useState(false);
 
   const subject = mission.pois.find((p) => p.id === selectedId) ?? mission.pois[0];
@@ -32,6 +45,8 @@ export function ShotPanel() {
         height,
         sweep,
         climb,
+        dollyZoom,
+        zoomRatio: ratio,
         startBearing: bearing ?? defaultStartBearing(st.mission, subject),
       });
       // Sample the real ground under each new waypoint so AGL and stems are correct.
@@ -62,6 +77,12 @@ export function ShotPanel() {
         />
       </Field>
       <p className="muted">{info.description}</p>
+      {kind === 'dollyzoom' && (
+        <p className="muted small">
+          Flies {Math.round(radius * (ratio - 1))} m between {radius} m and{' '}
+          {Math.round(radius * ratio)} m from the subject. Distance is the near end.
+        </p>
+      )}
       <div className="grid2">
         <Field label="Distance">
           <NumberInput value={radius} min={5} suffix="m" onChange={setRadius} />
@@ -73,6 +94,33 @@ export function ShotPanel() {
           <Field label="Sweep">
             <NumberInput value={sweep} step={15} suffix="°" onChange={setSweep} />
           </Field>
+        )}
+        {kind === 'dollyzoom' && (
+          <>
+            <Field label="Direction">
+              <Select
+                value={dollyZoom}
+                options={[
+                  { value: 'pull-out', label: 'Pull out, zoom in' },
+                  { value: 'push-in', label: 'Push in, zoom out' },
+                ]}
+                onChange={setDollyZoom}
+              />
+            </Field>
+            <Field
+              label="Zoom ratio"
+              hint={`Far distance over near distance. Up to ${maxRatio}× (${fMin}-${fMax} mm) on this drone.`}
+            >
+              <NumberInput
+                value={ratio}
+                step={0.5}
+                min={1.1}
+                max={maxRatio}
+                suffix="×"
+                onChange={setZoomRatio}
+              />
+            </Field>
+          </>
         )}
         {(kind === 'helix' || kind === 'dronie') && (
           <Field label="Climb">

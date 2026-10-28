@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   fmtTime,
   horizontalSpeed,
+  lensAt,
+  profileFov,
   sunInFrame,
   sunPosition,
   sunRelation,
@@ -15,6 +17,7 @@ import { useCamera, usePath, useSunTime } from '../derived';
 import { useFlyController } from '../fly/useFlyController';
 import { KEY_HELP, PAD_HELP } from '../fly/input';
 import { saveFile } from '../platform';
+import { FrameGuides, GuidesMenu } from './FrameGuides';
 
 /** Exposed for the fly controller and anything else that needs the camera's world. */
 export let activePov: PovView | undefined;
@@ -58,8 +61,8 @@ export function CameraView({ isMain }: { isMain: boolean }) {
   useEffect(() => {
     if (fly) return;
     const s = path.sample(time);
-    if (s) povRef.current?.setPose(s, fov.horizontal);
-  }, [fly, path, time, fov.horizontal]);
+    if (s) povRef.current?.setPose(s, profileFov(profile, 'video', s.focalMm).horizontal);
+  }, [fly, path, time, profile]);
 
   useFlyController(surfaceRef, getPov);
 
@@ -75,6 +78,8 @@ export function CameraView({ isMain }: { isMain: boolean }) {
         >
           <div ref={canvasRef} className="pov-canvas" />
           <div className="pov-thirds" />
+          <LiveGuides aspect={profile.videoAspect} />
+          {isMain && !rendering && <GuidesMenu />}
           {fly ? <FlyHud /> : <PlanHud />}
           {showTake && <TakePlayer take={take} />}
           <RecOverlay />
@@ -101,10 +106,17 @@ const SUN_SHORT: Record<SunRelation, string> = {
 };
 
 /** Sun elevation and where it falls on the frame; warns when the sun is in shot. */
-function SunHud({ yaw, pitch }: { yaw: number; pitch: number }) {
+function SunHud({
+  yaw,
+  pitch,
+  fov,
+}: {
+  yaw: number;
+  pitch: number;
+  fov: { horizontal: number; vertical: number };
+}) {
   const mission = useStore((s) => s.mission);
   const sunTime = useSunTime();
-  const { fov } = useCamera();
   const sun = sunPosition(sunTime, mission.takeoff.lat, mission.takeoff.lon);
   if (sun.elevation < -6) return <span>SUN ☾</span>;
   const inFrame = sunInFrame(yaw, pitch, fov.horizontal, fov.vertical, sun);
@@ -115,11 +127,37 @@ function SunHud({ yaw, pitch }: { yaw: number; pitch: number }) {
   );
 }
 
+/** Framing guides for the current pose: the timeline's in plan mode, the drone's in fly mode. */
+function LiveGuides({ aspect }: { aspect: number }) {
+  const fly = useView((s) => s.fly);
+  const hud = useView((s) => s.flyHud);
+  const time = useStore((s) => s.time);
+  const path = usePath();
+  const { profile } = useCamera();
+  if (fly) {
+    if (!hud) return null;
+    const v = profileFov(profile, 'video').vertical;
+    return (
+      <FrameGuides aspect={aspect} pitch={hud.state.pitch} height={hud.state.height} vFovDeg={v} />
+    );
+  }
+  const s = path.sample(time);
+  const v = profileFov(profile, 'video', s?.focalMm).vertical;
+  return (
+    <FrameGuides
+      aspect={aspect}
+      pitch={s?.pitch ?? 0}
+      height={s?.position.height ?? 0}
+      vFovDeg={v}
+    />
+  );
+}
+
 function PlanHud() {
   const time = useStore((s) => s.time);
   const mission = useStore((s) => s.mission);
   const path = usePath();
-  const { fov } = useCamera();
+  const { profile } = useCamera();
   const s = path.sample(time);
   if (!s)
     return <div className="hud top">Add waypoints, or press ✈ Fly to scout with the drone</div>;
@@ -129,6 +167,8 @@ function PlanHud() {
   const a = mission.waypoints[s.segment];
   const b = mission.waypoints[s.segment + 1] ?? a;
   const ground = a && b ? a.groundHeight + (b.groundHeight - a.groundHeight) * s.u : undefined;
+  const fov = profileFov(profile, 'video', s.focalMm);
+  const lens = lensAt(profile, s.focalMm);
   return (
     <div className="hud top">
       <span className="badge">PLAN</span>
@@ -138,8 +178,15 @@ function PlanHud() {
       <span>ALT {rel.toFixed(0)} m</span>
       {ground !== undefined && <span>AGL {(s.position.height - ground).toFixed(0)} m</span>}
       <span>D {home.toFixed(0)} m</span>
-      <span>FOV {fov.horizontal.toFixed(0)}°</span>
-      <SunHud yaw={s.yaw} pitch={s.pitch} />
+      <span title={`${fov.horizontal.toFixed(0)}° horizontal field of view`}>
+        {s.focalMm.toFixed(0)} mm
+      </span>
+      {lens.digital > 1.01 && (
+        <span className="warn" title={`Digital zoom on the ${lens.lensMm} mm camera`}>
+          DIGITAL {lens.digital.toFixed(1)}×
+        </span>
+      )}
+      <SunHud yaw={s.yaw} pitch={s.pitch} fov={fov} />
       <span className="right">
         {fmtTime(time)} / {fmtTime(path.duration)}
       </span>
@@ -151,6 +198,7 @@ function FlyHud() {
   const hud = useView((s) => s.flyHud);
   const mission = useStore((s) => s.mission);
   const [help, setHelp] = useState(true);
+  const { profile } = useCamera();
   if (!hud) return null;
   const s = hud.state;
   const rel = s.height - mission.takeoff.groundHeight;
@@ -170,7 +218,7 @@ function FlyHud() {
         {agl !== undefined && (
           <span className={agl > 120 ? 'warn' : ''}>AGL {agl.toFixed(0)} m</span>
         )}
-        <SunHud yaw={s.yaw} pitch={s.pitch} />
+        <SunHud yaw={s.yaw} pitch={s.pitch} fov={profileFov(profile, 'video')} />
         {hud.recordingPath && <span className="rec">● PATH {fmtTime(hud.pathSeconds)}</span>}
         <span className="right">
           {mission.waypoints.length} WP · {mission.pois.length} POI

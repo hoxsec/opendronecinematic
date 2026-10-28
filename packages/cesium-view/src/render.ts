@@ -21,7 +21,6 @@ const requestCompleted = (RequestScheduler as unknown as { requestCompletedEvent
 export interface OfflineRendererOptions {
   width: number;
   height: number;
-  horizontalFovDeg: number;
   settings: DataSourceSettings;
   /** The loaded GeoTIFF DEM, when the settings use one for terrain. */
   dem?: Dem;
@@ -78,7 +77,6 @@ export class OfflineRenderer {
     this.widget.canvas.height = opts.height;
     const frustum = this.widget.camera.frustum as PerspectiveFrustum;
     frustum.aspectRatio = opts.width / opts.height;
-    frustum.fov = CMath.toRadians(opts.horizontalFovDeg);
     frustum.near = 0.5;
   }
 
@@ -110,11 +108,17 @@ export class OfflineRenderer {
   }
 
   /**
-   * Render one frame at the pose, lit by the sun at `time`, waiting for tiles. Returns false if
-   * it timed out waiting.
+   * Render one frame at the pose and horizontal FOV, lit by the sun at `time`, waiting for tiles.
+   * Returns false if it timed out waiting.
    */
-  async renderFrame(pose: CameraPose, time: Date, signal?: AbortSignal): Promise<boolean> {
+  async renderFrame(
+    pose: CameraPose,
+    horizontalFovDeg: number,
+    time: Date,
+    signal?: AbortSignal,
+  ): Promise<boolean> {
     applyPose(this.widget.camera, pose);
+    (this.widget.camera.frustum as PerspectiveFrustum).fov = CMath.toRadians(horizontalFovDeg);
     applySunLight(this.widget.scene, this.widget.clock, time, this.opts.shadows ?? false);
     const start = performance.now();
     let stable = 0;

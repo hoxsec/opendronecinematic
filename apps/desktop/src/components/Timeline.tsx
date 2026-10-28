@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
-import { fmtTime } from '@odc/core';
+import { useEffect, useMemo } from 'react';
+import { fmtTime, zoomEvents } from '@odc/core';
 import { useStore } from '../store';
-import { usePath } from '../derived';
+import { useCamera, usePath } from '../derived';
 import { useView } from '../viewStore';
 
 export function Timeline({ onRender }: { onRender: () => void }) {
@@ -13,6 +13,9 @@ export function Timeline({ onRender }: { onRender: () => void }) {
   const { setTime, setPlaying, select } = useStore.getState();
   const path = usePath();
   const duration = path.duration;
+  const { profile } = useCamera();
+  const zooms = useMemo(() => zoomEvents(path, profile), [path, profile]);
+  const pct = (t: number) => `${duration ? (t / duration) * 100 : 0}%`;
 
   useEffect(() => {
     if (!playing) return;
@@ -70,6 +73,22 @@ export function Timeline({ onRender }: { onRender: () => void }) {
             setTime(Number(e.target.value));
           }}
         />
+        <div className="zoom-marks">
+          {zooms.map((z) => (
+            <span
+              key={z.t}
+              className={z.digital ? 'digital' : 'lens'}
+              style={{ left: pct(z.t) }}
+              title={
+                z.digital
+                  ? `${fmtTime(z.t)}: digital zoom on the ${z.lensMm} mm camera`
+                  : `${fmtTime(z.t)}: switches to the ${z.lensMm} mm camera (a jump in real footage)`
+              }
+            >
+              {z.digital ? '' : z.lensMm}
+            </span>
+          ))}
+        </div>
         <div className="ticks">
           {path.timings.map((tm, i) => (
             <button

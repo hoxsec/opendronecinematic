@@ -28,7 +28,7 @@ export async function renderFlight(req: RenderRequest) {
   }
 
   const controller = new AbortController();
-  const fov = profileFov(missionProfile(mission), 'video').horizontal;
+  const profile = missionProfile(mission);
   const total = Math.max(1, Math.round(path.duration * req.fps));
   const progress = {
     format: req.format,
@@ -50,7 +50,6 @@ export async function renderFlight(req: RenderRequest) {
     renderer = await OfflineRenderer.create({
       width: req.width,
       height: req.height,
-      horizontalFovDeg: fov,
       settings,
       dem,
       shadows: view.shadows,
@@ -62,7 +61,13 @@ export async function renderFlight(req: RenderRequest) {
     for (let i = 0; i < total; i++) {
       const t = i / req.fps;
       const sample = path.sample(t)!;
-      const complete = await renderer.renderFrame(sample, sunTimeAt(mission, t), controller.signal);
+      const fov = profileFov(profile, 'video', sample.focalMm).horizontal;
+      const complete = await renderer.renderFrame(
+        sample,
+        fov,
+        sunTimeAt(mission, t),
+        controller.signal,
+      );
       if (!complete) progress.slowFrames++;
       await encoder.addFrame(i);
       progress.frame = i + 1;
