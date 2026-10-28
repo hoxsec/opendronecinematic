@@ -102,7 +102,36 @@ export function GlobeView() {
       },
       onSelect(t: PickTarget) {
         dragStarted = false;
-        if (t.kind === 'waypoint' || t.kind === 'poi') st().select(t.id);
+        // Takeoff and survey corners have no panel selection; their arrows live in the scene.
+        st().select(t.kind === 'waypoint' || t.kind === 'poi' ? t.id : undefined);
+      },
+      onAxisDrag(t, axis, pos) {
+        const history = !dragStarted;
+        dragStarted = true;
+        const { mission: m } = st();
+        // Moving east/north crosses new ground; moving up keeps the ground it stands on.
+        const ground = axis === 'z' ? undefined : scene.groundHeightAt(pos.lat, pos.lon);
+        if (t.kind === 'vertex') {
+          st().moveSurveyVertex(t.index, { ...pos, height: ground ?? 0 }, { history });
+        } else if (t.kind === 'waypoint') {
+          const wp = m.waypoints.find((w) => w.id === t.id);
+          if (!wp) return;
+          const groundHeight = ground ?? wp.groundHeight;
+          const alt = altFromHeight(m, groundHeight, pos.height);
+          st().updateWaypoint(
+            t.id,
+            { lat: pos.lat, lon: pos.lon, groundHeight, alt: Math.round(alt * 10) / 10 },
+            { history },
+          );
+        } else if (t.kind === 'poi') {
+          st().updatePoi(t.id, pos, { history });
+        } else {
+          const groundHeight = axis === 'z' ? pos.height : (ground ?? m.takeoff.groundHeight);
+          st().setMission(
+            { ...m, takeoff: { lat: pos.lat, lon: pos.lon, groundHeight } },
+            { history },
+          );
+        }
       },
       onDrag(t, pos) {
         const history = !dragStarted;

@@ -46,6 +46,7 @@ import {
 import { sampleTerrainHeights } from './terrain';
 import { applyPose, type CameraPose } from './pose';
 import { applySunLight } from './lighting';
+import { AXES, AxisGizmo, axisDirection, closestOnLine, gizmoAxis, type Axis } from './gizmo';
 
 export type PickTarget =
   | { kind: 'waypoint' | 'poi'; id: string }
@@ -61,6 +62,11 @@ export interface SceneEvents {
   /** Continuous while dragging a mission object across the ground. */
   onDrag?(target: PickTarget, pos: Geodetic): void;
   onDragEnd?(target: PickTarget): void;
+  /**
+   * Continuous while dragging one of the selected object's axis arrows. `pos` is the object's new
+   * position: only lat/lon change for x/y (east/north), only height for z (up).
+   */
+  onAxisDrag?(target: PickTarget, axis: Axis, pos: Geodetic): void;
 }
 
 const COLORS = {
@@ -106,6 +112,18 @@ export class MissionScene {
   private applied?: AppliedSources;
   private sourcesQueue: Promise<unknown> = Promise.resolve();
   private dragging?: PickTarget;
+  private readonly gizmo: AxisGizmo;
+  /** The object showing the axis arrows. */
+  private gizmoTarget?: PickTarget;
+  private axisDrag?: {
+    target: PickTarget;
+    axis: Axis;
+    start: Geodetic;
+    origin: Cartesian3;
+    dir: Cartesian3;
+    t0: number;
+  };
+  private mission?: Mission;
   private droneEntity?: Entity;
   private dem?: Dem;
   events: SceneEvents = {};
@@ -131,6 +149,8 @@ export class MissionScene {
     this.viewer.dataSources.add(this.missionLayer);
     this.viewer.dataSources.add(this.droneLayer);
     this.viewer.dataSources.add(this.obstacleLayer);
+    this.gizmo = new AxisGizmo(this.viewer.camera);
+    this.viewer.dataSources.add(this.gizmo.layer);
 
     this.frustumCamera = new Camera(scene);
     this.frustumCamera.frustum = new PerspectiveFrustum({
@@ -241,32 +261,144 @@ export class MissionScene {
     return id ? parseId(id) : undefined;
   }
 
+  /** The gizmo arrow under a screen position; looks past the marker dot it sits on. */
+  private pickAxis(pos: Cartesian2): Axis | undefined {
+    if (!this.gizmo.visible) return undefined;
+    for (const picked of this.viewer.scene.drillPick(pos, 4)) {
+      const axis = picked?.id instanceof Entity ? gizmoAxis(picked.id.id) : undefined;
+      if (axis) return axis;
+    }
+    return undefined;
+  }
+
+  /** Where `pos` points along the axis line of the current axis drag. */
+  private axisParam(pos: Cartesian2, origin: Cartesian3, dir: Cartesian3): number | undefined {
+    const ray = this.viewer.camera.getPickRay(pos);
+    return ray ? closestOnLine(origin, dir, ray.origin, ray.direction) : undefined;
+  }
+
   private onDown(pos: Cartesian2) {
+    const axis = this.pickAxis(pos);
+    const gt = this.gizmoTarget;
+    const start = gt && this.targetPosition(gt);
+    if (axis && gt && start) {
+      const origin = cart(start);
+      const dir = axisDirection(origin, axis);
+      const t0 = this.axisParam(pos, origin, dir);
+      if (t0 === undefined) return;
+      this.axisDrag = { target: gt, axis, start, origin, dir, t0 };
+      this.viewer.scene.screenSpaceCameraController.enableInputs = false;
+      this.events.onSelect?.(gt);
+      return;
+    }
     const t = this.pickTarget(pos);
     if (!t) return;
     this.dragging = t;
     this.viewer.scene.screenSpaceCameraController.enableInputs = false;
+    this.setGizmoTarget(t);
     this.events.onSelect?.(t);
   }
 
   private onMove(pos: Cartesian2) {
+    const ad = this.axisDrag;
+    if (ad) {
+      const t = this.axisParam(pos, ad.origin, ad.dir);
+      if (t === undefined) return;
+      const p = Cartesian3.add(
+        ad.origin,
+        Cartesian3.multiplyByScalar(ad.dir, t - ad.t0, new Cartesian3()),
+        new Cartesian3(),
+      );
+      const c = Cartographic.fromCartesian(p);
+      if (!c) return;
+      const moved: Geodetic =
+        ad.axis === 'z'
+          ? { ...ad.start, height: c.height }
+          : {
+              lat: CMath.toDegrees(c.latitude),
+              lon: CMath.toDegrees(c.longitude),
+              height: ad.start.height,
+            };
+      this.events.onAxisDrag?.(ad.target, ad.axis, moved);
+      return;
+    }
     if (!this.dragging) return;
     const g = this.pickGround(pos);
     if (g) this.events.onDrag?.(this.dragging, g);
   }
 
   private onUp() {
-    if (!this.dragging) return;
-    const t = this.dragging;
+    const t = this.axisDrag?.target ?? this.dragging;
+    if (!t) return;
     this.dragging = undefined;
+    this.axisDrag = undefined;
     this.viewer.scene.screenSpaceCameraController.enableInputs = true;
     this.events.onDragEnd?.(t);
   }
 
   private onClick(pos: Cartesian2) {
-    if (this.pickTarget(pos)) return;
+    if (this.pickTarget(pos) || this.pickAxis(pos)) return;
+    this.setGizmoTarget(undefined);
     const g = this.pickGround(pos);
     if (g) this.events.onGroundClick?.(g);
+  }
+
+  /** Current position of a mission object in the last rendered mission. */
+  private targetPosition(t: PickTarget): Geodetic | undefined {
+    const m = this.mission;
+    if (!m) return undefined;
+    switch (t.kind) {
+      case 'takeoff':
+        return { ...m.takeoff, height: m.takeoff.groundHeight };
+      case 'waypoint': {
+        const wp = m.waypoints.find((w) => w.id === t.id);
+        return wp && { lat: wp.lat, lon: wp.lon, height: waypointHeight(m, wp) };
+      }
+      case 'poi':
+        return m.pois.find((p) => p.id === t.id);
+      case 'vertex': {
+        const v = m.survey?.polygon[t.index];
+        return v && { lat: v.lat, lon: v.lon, height: this.groundHeightAt(v.lat, v.lon) ?? 0 };
+      }
+    }
+  }
+
+  private setGizmoTarget(t: PickTarget | undefined) {
+    this.gizmoTarget = t;
+    const pos = t && this.targetPosition(t);
+    if (!pos) this.gizmoTarget = undefined;
+    // Survey corners are clamped to the ground, so they only move east/north.
+    this.gizmo.set(pos && cart(pos), t?.kind === 'vertex' ? ['x', 'y'] : AXES);
+    this.viewer.scene.requestRender();
+  }
+
+  /**
+   * Best synchronous estimate of the ground height (ellipsoid) at a location, from the DEM, loaded
+   * terrain tiles, 3D tiles and offline buildings. For live drags; `sampleGround` is exact.
+   */
+  groundHeightAt(lat: number, lon: number): number | undefined {
+    const { scene } = this.viewer;
+    const c = Cartographic.fromDegrees(lon, lat);
+    // Outside the DEM (or without terrain) the globe is a flat 0 m; that's no ground reading.
+    let h = this.dem
+      ? this.dem.heightAt(lat, lon)
+      : scene.terrainProvider instanceof EllipsoidTerrainProvider
+        ? undefined
+        : scene.globe.getHeight(c);
+    const higher = (t: number | undefined) => {
+      if (t !== undefined && !Number.isNaN(t)) h = h === undefined ? t : Math.max(h, t);
+    };
+    higher(this.applied?.buildings?.heightAt(lat, lon));
+    if ((this.applied?.tilesets.length ?? 0) > 0 && scene.sampleHeightSupported) {
+      const exclude = [
+        ...this.missionLayer.entities.values,
+        ...this.droneLayer.entities.values,
+        ...this.obstacleLayer.entities.values,
+        ...this.gizmo.layer.entities.values,
+      ];
+      higher(scene.sampleHeight(c, exclude));
+    }
+    return h;
   }
 
   /** Redraw waypoints, POIs, takeoff and the flight path. */
@@ -275,9 +407,12 @@ export class MissionScene {
     path: FlightPath,
     opts: { selectedId?: string; issues?: SafetyIssue[] } = {},
   ) {
+    this.mission = mission;
     const ents = this.missionLayer.entities;
-    ents.suspendEvents();
+    // Remove before suspending: a remove and re-add of the same id in one batch cancels out, and
+    // the visualizers would keep drawing the old entity at its old position.
     ents.removeAll();
+    ents.suspendEvents();
 
     const outline = mission.survey?.polygon ?? [];
     if (outline.length >= 3) {
@@ -402,6 +537,19 @@ export class MissionScene {
       }
     }
     ents.resumeEvents();
+
+    // Follow the selection (also when picked from a panel); takeoff and survey corners have no
+    // selection of their own, so they keep the arrows until something else is clicked.
+    const sel = opts.selectedId;
+    const gt = this.gizmoTarget;
+    if (sel) {
+      const kind = mission.waypoints.some((w) => w.id === sel) ? 'waypoint' : 'poi';
+      this.setGizmoTarget({ kind, id: sel });
+    } else if (gt?.kind === 'waypoint' || gt?.kind === 'poi') {
+      this.setGizmoTarget(undefined);
+    } else {
+      this.setGizmoTarget(gt);
+    }
     this.viewer.scene.requestRender();
   }
 
