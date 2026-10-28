@@ -8,3 +8,4 @@ export * from './terrain';
 export * from './vectorTiles';
 export * from './localBuildings';
 export * from './lighting';
+export * from './gizmo';
