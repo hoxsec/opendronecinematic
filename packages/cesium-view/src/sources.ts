@@ -6,13 +6,13 @@ import {
   EllipsoidTerrainProvider,
   ImageryLayer,
   Ion,
+  IonResource,
   MapboxImageryProvider,
   MapboxStyleImageryProvider,
   OpenStreetMapImageryProvider,
   UrlTemplateImageryProvider,
   WebMapServiceImageryProvider,
   WebMapTileServiceImageryProvider,
-  createGooglePhotorealistic3DTileset,
   createOsmBuildingsAsync,
   createWorldTerrainAsync,
   type ImageryLayerCollection,
@@ -482,8 +482,7 @@ export async function applySources(
     }
   };
   if (s.buildings === 'osm') await add('OSM Buildings', () => createOsmBuildingsAsync());
-  if (s.buildings === 'google')
-    await add('Google 3D Tiles', () => createGooglePhotorealistic3DTileset());
+  if (s.buildings === 'google') await add('Google 3D Tiles', createGoogleTileset);
   for (const url of s.customTilesets)
     await add(`Tileset ${url}`, () => Cesium3DTileset.fromUrl(url));
 
@@ -501,6 +500,23 @@ export async function applySources(
   // Photorealistic tiles already contain terrain; hiding the globe avoids z-fighting.
   scene.globe.show = s.buildings !== 'google';
   return { tilesets, buildings, errors };
+}
+
+/** Cesium ion asset id of Google Photorealistic 3D Tiles. */
+const GOOGLE_3D_TILES_ASSET = 2275207;
+
+/**
+ * Like Cesium's createGooglePhotorealistic3DTileset, but with a Resource of its own. Cesium's
+ * version hands every caller the same cached Resource, so when the map and the camera preview
+ * load at once the second fails with "The Resource is already being fetched".
+ */
+async function createGoogleTileset(): Promise<Cesium3DTileset> {
+  const resource = await IonResource.fromAssetId(GOOGLE_3D_TILES_ASSET);
+  return Cesium3DTileset.fromUrl(resource, {
+    cacheBytes: 1536 * 1024 * 1024,
+    maximumCacheOverflowBytes: 1024 * 1024 * 1024,
+    enableCollision: true,
+  });
 }
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));

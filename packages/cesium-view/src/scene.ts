@@ -174,6 +174,16 @@ export class MissionScene {
   }
 
   /**
+   * Mouse-wheel zoom: `speed` multiplies Cesium's default step, `snappy` stops the camera as soon
+   * as the wheel stops instead of letting it coast.
+   */
+  setZoom(speed: number, snappy: boolean) {
+    const c = this.viewer.scene.screenSpaceCameraController;
+    c.zoomFactor = 5 * speed;
+    c.inertiaZoom = snappy ? 0 : 0.8;
+  }
+
+  /**
    * Look at a location from the south at an oblique angle. `groundHeight` (ellipsoid) keeps the
    * camera above high terrain. duration 0 jumps instantly.
    */

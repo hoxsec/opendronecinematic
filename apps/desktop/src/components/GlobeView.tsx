@@ -33,6 +33,7 @@ export function GlobeView() {
   const focusToken = useStore((s) => s.focusToken);
   const mode = useStore((s) => s.mode);
   const fly = useView((s) => s.fly);
+  const zoom = useView((s) => s.zoom);
   const path = usePath();
   const { fov, profile } = useCamera();
 
@@ -73,6 +74,10 @@ export function GlobeView() {
       cancelled = true;
     };
   }, [settings, dem]);
+
+  useEffect(() => {
+    sceneRef.current?.setZoom(zoom.speed, zoom.snappy);
+  }, [zoom]);
 
   // Mouse interaction, routed by the current tool mode.
   useEffect(() => {

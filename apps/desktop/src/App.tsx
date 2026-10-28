@@ -67,6 +67,8 @@ export function App() {
         if (!id) return;
         if (st.mission.waypoints.some((w) => w.id === id)) st.removeWaypoint(id);
         else if (st.mission.pois.some((p) => p.id === id)) st.removePoi(id);
+      } else if (!mod && e.key.toLowerCase() === 'l') {
+        view.setLayout(view.layout === 'split' ? 'pip' : 'split');
       } else if (!mod && e.key.toLowerCase() === 'f') {
         if (!view.render) view.setFly(true);
       } else if (!mod) {
