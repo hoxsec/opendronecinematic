@@ -1,6 +1,6 @@
 import { strFromU8, unzipSync } from 'fflate';
 import {
-  DRONE_PROFILES,
+  profileForWpml,
   createWaypoint,
   newId,
   type AltitudeMode,
@@ -285,7 +285,11 @@ export function importDjiWpml(xml: string, template?: string): ImportedPlan {
   const ref = tag(template ?? xml, 'takeOffRefPoint');
   const [hlat, hlon] = (ref ?? '').split(',').map(Number);
   const droneEnum = num(tag(config, 'droneEnumValue'));
-  const profile = DRONE_PROFILES.find((p) => p.wpml?.droneEnumValue === droneEnum);
+  const profile = profileForWpml(
+    droneEnum,
+    num(tag(config, 'droneSubEnumValue')),
+    num(tag(config, 'payloadEnumValue')),
+  );
 
   return {
     format: 'DJI WPML',

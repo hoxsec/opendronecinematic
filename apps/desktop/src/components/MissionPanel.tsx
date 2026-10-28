@@ -1,4 +1,10 @@
-import { DRONE_PROFILES, fmtTime, type AltitudeMode, type MissionSettings } from '@odc/core';
+import {
+  DRONE_FAMILIES,
+  DRONE_PROFILES,
+  fmtTime,
+  type AltitudeMode,
+  type MissionSettings,
+} from '@odc/core';
 import { useStore } from '../store';
 import { useCamera, usePath } from '../derived';
 import { Field, NumberInput, Section, Select } from './fields';
@@ -26,11 +32,20 @@ export function MissionPanel() {
         />
       </Field>
       <Field label="Drone">
-        <Select
+        <select
           value={mission.droneProfileId}
-          options={DRONE_PROFILES.map((p) => ({ value: p.id, label: p.name }))}
-          onChange={(droneProfileId) => setMission((m) => ({ ...m, droneProfileId }))}
-        />
+          onChange={(e) => setMission((m) => ({ ...m, droneProfileId: e.target.value }))}
+        >
+          {DRONE_FAMILIES.map((f) => (
+            <optgroup key={f.id} label={f.label}>
+              {DRONE_PROFILES.filter((p) => p.family === f.id).map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </optgroup>
+          ))}
+        </select>
       </Field>
       {mission.droneProfileId === 'custom' && (
         <div className="grid3">
