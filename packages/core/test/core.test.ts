@@ -192,6 +192,37 @@ describe('safety', () => {
     const report = evaluateSafety(m, path, path.sampleByDistance(20), []);
     expect(report.issues.some((i) => i.code === 'speed')).toBe(true);
   });
+
+  it('flags mapped obstacles under the path and nearby airfields', () => {
+    const m = missionFromEnu([
+      [0, 0, 30],
+      [0, 400, 30],
+    ]);
+    const path = buildFlightPath(m);
+    const samples = path.sampleByDistance(5);
+    const ground = samples.map(() => 50);
+    const frame = new EnuFrame({ lat: takeoff.lat, lon: takeoff.lon, height: 50 });
+    const at = (e: number, n: number): [number, number] => {
+      const g = frame.fromEnu([e, n, 0]);
+      return [g.lon, g.lat];
+    };
+    const report = evaluateSafety(m, path, samples, ground, undefined, [
+      { kind: 'mast', name: 'Hill mast', height: 45, heightTagged: true, coords: [at(10, 200)] },
+      { kind: 'mast', height: 45, heightTagged: true, coords: [at(300, 200)] },
+      {
+        kind: 'power_line',
+        height: 25,
+        heightTagged: false,
+        coords: [at(-100, 100), at(100, 100)],
+      },
+      { kind: 'aerodrome', name: 'Field', height: 0, heightTagged: false, coords: [at(2000, 0)] },
+    ]);
+    const obstacles = report.issues.filter((i) => i.code === 'obstacle');
+    expect(obstacles).toHaveLength(2);
+    expect(obstacles[0]!.message).toContain('Hill mast');
+    expect(obstacles[1]!.message).toContain('power line');
+    expect(report.issues.some((i) => i.code === 'airfield')).toBe(true);
+  });
 });
 
 describe('sanity', () => {

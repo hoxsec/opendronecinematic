@@ -2,6 +2,18 @@ import { vec } from './geo';
 import { waypointGeodetic, type Mission } from './mission';
 import type { FlightPath, PathSample } from './path';
 import { missionProfile } from './profiles';
+import {
+  OBSTACLE_LABELS,
+  distanceToPoints,
+  isAirfield,
+  obstacleEnu,
+  type Obstacle,
+} from './obstacles';
+
+/** Horizontal distance at which a mapped mast, pylon or line counts as being under the path. */
+export const OBSTACLE_BUFFER = 25;
+/** Distance from an airfield that triggers an airspace reminder. */
+export const AIRFIELD_RADIUS = { aerodrome: 5000, heliport: 1000 } as const;
 
 export interface SafetyLimits {
   /** Minimum metres between the aircraft and terrain/buildings below it. */
@@ -21,7 +33,8 @@ export const DEFAULT_LIMITS: SafetyLimits = {
   batteryReserve: 0.25,
 };
 
-export type SafetyCode = 'clearance' | 'ceiling' | 'distance' | 'speed' | 'climb' | 'battery';
+export type SafetyCode =
+  'clearance' | 'obstacle' | 'airfield' | 'ceiling' | 'distance' | 'speed' | 'climb' | 'battery';
 
 export interface SafetyIssue {
   severity: 'error' | 'warning';
@@ -46,7 +59,8 @@ export interface SafetyReport {
 
 /**
  * Evaluate a planned flight. `groundHeights[i]` is the ellipsoid height of whatever lies beneath
- * `samples[i]` (terrain or 3D tiles); undefined entries are skipped.
+ * `samples[i]` (terrain or 3D tiles); undefined entries are skipped. `obstacles` are mapped masts,
+ * power lines and airfields near the path, with heights above the ground.
  */
 export function evaluateSafety(
   mission: Mission,
@@ -54,6 +68,7 @@ export function evaluateSafety(
   samples: PathSample[],
   groundHeights: (number | undefined)[],
   limits: SafetyLimits = DEFAULT_LIMITS,
+  obstacles: Obstacle[] = [],
 ): SafetyReport {
   const profile = missionProfile(mission);
   const issues: SafetyIssue[] = [];
@@ -97,6 +112,8 @@ export function evaluateSafety(
       to: r.to,
     });
   }
+  issues.push(...obstacleIssues(path, samples, groundHeights, limits, obstacles));
+
   for (const r of ranges((s, i) => (clearanceAt(s, i) ?? -Infinity) > limits.maxAgl)) {
     issues.push({
       severity: 'warning',
@@ -187,6 +204,62 @@ export function evaluateSafety(
     minClearance: minClear,
     maxAgl,
   };
+}
+
+function obstacleIssues(
+  path: FlightPath,
+  samples: PathSample[],
+  groundHeights: (number | undefined)[],
+  limits: SafetyLimits,
+  obstacles: Obstacle[],
+): SafetyIssue[] {
+  const issues: SafetyIssue[] = [];
+  for (const o of obstacles) {
+    const pts = obstacleEnu(path.frame, o);
+    const what = `${o.name ? `${OBSTACLE_LABELS[o.kind]} "${o.name}"` : `a ${OBSTACLE_LABELS[o.kind]}`}`;
+    if (isAirfield(o)) {
+      const radius = AIRFIELD_RADIUS[o.kind as keyof typeof AIRFIELD_RADIUS];
+      let nearest: { d: number; s: number } | undefined;
+      for (const s of samples) {
+        const d = distanceToPoints(pts, s.enu);
+        if (d < radius && (!nearest || d < nearest.d)) nearest = { d, s: s.s };
+      }
+      if (nearest) {
+        issues.push({
+          severity: 'warning',
+          code: 'airfield',
+          message: `Within ${(nearest.d / 1000).toFixed(1)} km of ${what}: check the airspace and whether you need permission.`,
+          from: nearest.s,
+          to: nearest.s,
+        });
+      }
+      continue;
+    }
+    // Samples passing over the obstacle with less than the minimum clearance above its top.
+    let worst: { clearance: number; from: number; to: number } | undefined;
+    samples.forEach((s, i) => {
+      const g = groundHeights[i];
+      if (g === undefined || distanceToPoints(pts, s.enu) > OBSTACLE_BUFFER) return;
+      const clearance = s.position.height - (g + o.height);
+      if (clearance >= limits.minClearance) return;
+      if (!worst) worst = { clearance, from: s.s, to: s.s };
+      else {
+        worst.clearance = Math.min(worst.clearance, clearance);
+        worst.to = s.s;
+      }
+    });
+    if (worst) {
+      const est = o.heightTagged ? '' : ', height estimated';
+      issues.push({
+        severity: 'error',
+        code: 'obstacle',
+        message: `${worst.clearance < 0 ? 'Below the top of' : `Less than ${limits.minClearance} m above`} ${what} (${Math.round(o.height)} m${est}, ${fmtRange(worst)}).`,
+        from: worst.from,
+        to: worst.to,
+      });
+    }
+  }
+  return issues;
 }
 
 /** Distance between two path samples, ignoring altitude. */

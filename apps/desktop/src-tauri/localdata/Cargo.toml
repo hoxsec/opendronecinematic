@@ -1,0 +1,18 @@
+[package]
+name = "odc-localdata"
+version = "0.1.0"
+description = "Offline country map data for OpenDroneCinematic: download, obstacle extraction and a localhost tile server"
+edition = "2021"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+flate2 = "1"
+osmpbf = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"
+tar = "0.4"
+tiny_http = "0.12"
+ureq = "2"
+zip = { version = "2", default-features = false, features = ["deflate"] }

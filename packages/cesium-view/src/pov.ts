@@ -5,11 +5,10 @@ import {
   EllipsoidTerrainProvider,
   Math as CMath,
   PerspectiveFrustum,
-  type Cesium3DTileset,
   type Scene,
 } from 'cesium';
 import type { Dem, Geodetic } from '@odc/core';
-import { applySources, type DataSourceSettings } from './sources';
+import { applySources, type AppliedSources, type DataSourceSettings } from './sources';
 import { applyPose, type CameraPose } from './pose';
 
 /**
@@ -19,7 +18,8 @@ import { applyPose, type CameraPose } from './pose';
  */
 export class PovView {
   readonly widget: CesiumWidget;
-  private tilesets: Cesium3DTileset[] = [];
+  private applied?: AppliedSources;
+  private sourcesQueue: Promise<unknown> = Promise.resolve();
 
   constructor(container: HTMLElement) {
     this.widget = new CesiumWidget(container, {
@@ -32,16 +32,21 @@ export class PovView {
     scene.screenSpaceCameraController.enableInputs = false;
   }
 
-  async setSources(settings: DataSourceSettings, dem?: Dem) {
-    const { tilesets, errors } = await applySources(
-      this.widget.scene,
-      this.widget.imageryLayers,
-      settings,
-      this.tilesets,
-      dem,
-    );
-    this.tilesets = tilesets;
-    return errors;
+  /** Apply data sources; overlapping calls run in order, like MissionScene.setSources. */
+  setSources(settings: DataSourceSettings, dem?: Dem): Promise<string[]> {
+    const run = this.sourcesQueue.then(async () => {
+      if (this.widget.isDestroyed()) return [];
+      this.applied = await applySources(
+        this.widget.scene,
+        this.widget.imageryLayers,
+        settings,
+        this.applied,
+        dem,
+      );
+      return this.applied.errors;
+    });
+    this.sourcesQueue = run.catch(() => {});
+    return run;
   }
 
   setPose(pose: CameraPose, horizontalFovDeg: number) {
@@ -65,12 +70,13 @@ export class PovView {
     const { scene } = this.widget;
     const c = Cartographic.fromDegrees(lon, lat);
     const terrain = scene.globe.show ? scene.globe.getHeight(c) : undefined;
-    let tiles: number | undefined;
-    if (this.tilesets.length && scene.sampleHeightSupported) {
+    let tiles = this.applied?.buildings?.heightAt(lat, lon);
+    if (this.applied?.tilesets.length && scene.sampleHeightSupported) {
       try {
-        tiles = scene.sampleHeight(c);
+        const h = scene.sampleHeight(c);
+        if (h !== undefined) tiles = tiles === undefined ? h : Math.max(tiles, h);
       } catch {
-        tiles = undefined;
+        /* keep what we have */
       }
     }
     if (terrain === undefined) return tiles;

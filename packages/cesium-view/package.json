@@ -8,8 +8,10 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "@mapbox/vector-tile": "^3.0.0",
     "@odc/core": "0.1.0",
     "cesium": "^1.146.0",
-    "geotiff": "^2.1.3"
+    "geotiff": "^2.1.3",
+    "pbf": "^5.1.2"
   }
 }

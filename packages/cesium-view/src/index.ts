@@ -4,3 +4,6 @@ export * from './scene';
 export * from './pov';
 export * from './render';
 export * from './dem';
+export * from './terrain';
+export * from './vectorTiles';
+export * from './localBuildings';

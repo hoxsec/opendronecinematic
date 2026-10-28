@@ -17,7 +17,12 @@ import {
   type SurveySpec,
   type Waypoint,
 } from '@odc/core';
-import { DEFAULT_DATA_SOURCES, readGeoTiffDem, type DataSourceSettings } from '@odc/cesium-view';
+import {
+  DEFAULT_DATA_SOURCES,
+  readGeoTiffDem,
+  withDefaults,
+  type DataSourceSettings,
+} from '@odc/cesium-view';
 import { loadDemFile } from './demStore';
 
 export type Mode = 'select' | 'addWaypoint' | 'addPoi' | 'setTakeoff' | 'drawSurvey';
@@ -32,11 +37,11 @@ const DEFAULT_TAKEOFF = { lat: 46.5935, lon: 7.9091, groundHeight: 0 };
 function loadSettings(): DataSourceSettings {
   try {
     const raw = localStorage.getItem(SETTINGS_KEY);
-    if (raw) return { ...DEFAULT_DATA_SOURCES, ...JSON.parse(raw) };
+    if (raw) return withDefaults(JSON.parse(raw));
   } catch {
     /* ignore corrupt settings */
   }
-  return { ...DEFAULT_DATA_SOURCES };
+  return withDefaults(DEFAULT_DATA_SOURCES);
 }
 
 function loadAutosave(): Mission {

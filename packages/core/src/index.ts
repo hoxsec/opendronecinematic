@@ -4,6 +4,7 @@ export * from './profiles';
 export * from './camera';
 export * from './path';
 export * from './safety';
+export * from './obstacles';
 export * from './templates';
 export * from './flight-sim';
 export * from './track';

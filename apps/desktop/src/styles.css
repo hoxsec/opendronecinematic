@@ -780,6 +780,73 @@ input[type='range'] {
   font-size: 16px;
 }
 
+.modal.wide {
+  width: min(760px, calc(100% - 32px));
+}
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+.warn-text {
+  color: var(--warn);
+}
+.list.picker {
+  max-height: 200px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+}
+.list.regions li {
+  cursor: default;
+}
+.row-actions.always {
+  opacity: 1;
+}
+.download {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.download-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.download-head .ellipsis {
+  flex: 1;
+  min-width: 0;
+}
+.battery div.indeterminate {
+  width: 30% !important;
+  background: var(--accent);
+  animation: indeterminate 1.4s ease-in-out infinite;
+}
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(340%);
+  }
+}
+.download-options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.download-options p {
+  margin: 0;
+}
+
 .toast {
   position: fixed;
   left: 50%;
