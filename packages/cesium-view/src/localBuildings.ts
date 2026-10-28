@@ -50,6 +50,7 @@ export class LocalBuildings {
   private lastCenter?: Cartesian3;
   private destroyed = false;
   private pending = 0;
+  private visible = true;
 
   constructor(
     private readonly scene: Scene,
@@ -69,6 +70,12 @@ export class LocalBuildings {
     if (this.pending > 0) return false;
     for (const t of this.tiles.values()) if (t.primitive && !t.primitive.ready) return false;
     return true;
+  }
+
+  /** Show or hide extrusions without discarding building data used by safety checks. */
+  setVisible(visible: boolean) {
+    this.visible = visible;
+    for (const tile of this.tiles.values()) if (tile.primitive) tile.primitive.show = visible;
   }
 
   owns(primitive: unknown) {
@@ -216,6 +223,7 @@ export class LocalBuildings {
     if (!instances.length) return;
     tile.primitive = this.scene.primitives.add(
       new Primitive({
+        show: this.visible,
         geometryInstances: instances,
         appearance: new PerInstanceColorAppearance({ closed: true }),
         releaseGeometryInstances: true,

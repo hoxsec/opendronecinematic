@@ -17,13 +17,16 @@ import {
   HeightReference,
   Matrix4,
   HorizontalOrigin,
+  ImageryLayer,
   LabelStyle,
   Math as CMath,
+  OpenStreetMapImageryProvider,
   PerspectiveFrustum,
   PolylineDashMaterialProperty,
   PolylineGlowMaterialProperty,
   ScreenSpaceEventHandler,
   ScreenSpaceEventType,
+  SceneMode,
   VerticalOrigin,
   Viewer,
   defined,
@@ -126,6 +129,8 @@ export class MissionScene {
   private mission?: Mission;
   private droneEntity?: Entity;
   private dem?: Dem;
+  private map2D = false;
+  private map2DLayer?: ImageryLayer;
   events: SceneEvents = {};
 
   constructor(container: HTMLElement, hasIonToken: boolean) {
@@ -136,7 +141,7 @@ export class MissionScene {
       baseLayerPicker: false,
       geocoder: hasIonToken ? true : [new CartographicGeocoderService()],
       homeButton: false,
-      sceneModePicker: false,
+      sceneModePicker: true,
       navigationHelpButton: false,
       fullscreenButton: false,
       selectionIndicator: false,
@@ -144,6 +149,10 @@ export class MissionScene {
       terrainProvider: new EllipsoidTerrainProvider(),
     });
     const { scene } = this.viewer;
+    scene.morphStart.addEventListener((_transitioner, _oldMode, newMode) => {
+      this.map2D = newMode === SceneMode.SCENE2D;
+      this.updateMapVisibility();
+    });
     scene.globe.depthTestAgainstTerrain = true;
     scene.globe.enableLighting = false;
     this.viewer.dataSources.add(this.missionLayer);
@@ -188,10 +197,31 @@ export class MissionScene {
         dem,
       );
       this.dem = effectiveSources(settings).terrain === 'geotiff' ? dem : undefined;
+      this.updateMapVisibility();
       return this.applied.errors;
     });
     this.sourcesQueue = run.catch(() => {});
     return run;
+  }
+
+  private updateMapVisibility() {
+    const layers = this.viewer.imageryLayers;
+    if (this.map2DLayer && !layers.contains(this.map2DLayer)) this.map2DLayer = undefined;
+    if (this.map2D && !this.map2DLayer) {
+      this.map2DLayer = layers.addImageryProvider(
+        new OpenStreetMapImageryProvider({
+          url: 'https://tile.openstreetmap.org/',
+          maximumLevel: 19,
+        }),
+      );
+    } else if (!this.map2D && this.map2DLayer) {
+      layers.remove(this.map2DLayer);
+      this.map2DLayer = undefined;
+    }
+    if (!this.applied) return;
+    for (const tileset of this.applied.tilesets) tileset.show = !this.map2D;
+    this.applied.buildings?.setVisible(!this.map2D);
+    this.viewer.scene.globe.show = this.map2D || this.applied.showGlobe;
   }
 
   /**

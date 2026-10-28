@@ -427,6 +427,8 @@ async function terrainProvider(s: DataSourceSettings, dem?: Dem): Promise<Terrai
 
 export interface AppliedSources {
   tilesets: Cesium3DTileset[];
+  /** Whether the globe should be visible in 3D. */
+  showGlobe: boolean;
   /** Offline buildings from the downloaded region, when selected. */
   buildings?: LocalBuildings;
   errors: string[];
@@ -498,8 +500,9 @@ export async function applySources(
   }
 
   // Photorealistic tiles already contain terrain; hiding the globe avoids z-fighting.
-  scene.globe.show = s.buildings !== 'google';
-  return { tilesets, buildings, errors };
+  const showGlobe = s.buildings !== 'google';
+  scene.globe.show = showGlobe;
+  return { tilesets, buildings, errors, showGlobe };
 }
 
 /** Cesium ion asset id of Google Photorealistic 3D Tiles. */
