@@ -1,0 +1,28 @@
+{
+  "name": "opendronecinematic",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Open-source 3D drone flight planner for cinematic shots, waypoints and surveys, built on CesiumJS.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev -w @odc/desktop",
+    "build": "npm run build -w @odc/desktop",
+    "tauri": "npm run tauri -w @odc/desktop --",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.5",
+    "prettier": "^3.6.0",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}

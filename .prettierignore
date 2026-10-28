@@ -1,0 +1,7 @@
+node_modules
+dist
+apps/desktop/src-tauri/target
+apps/desktop/src-tauri/gen
+packages/exporters/test/__snapshots__
+.claude
+apps/desktop/src-tauri/icons

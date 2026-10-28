@@ -1,0 +1,14 @@
+{
+  "name": "@odc/cesium-view",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@odc/core": "0.1.0",
+    "cesium": "^1.146.0"
+  }
+}
