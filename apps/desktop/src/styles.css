@@ -592,11 +592,13 @@ input[type='range'] {
 .fly-help dd {
   margin: 0;
 }
+/* Sits under the HUD bar: the mini-screen usually covers the bottom-right corner. */
 .rec-overlay {
   position: absolute;
+  z-index: 2;
   left: 10px;
   right: 10px;
-  bottom: 10px;
+  top: 40px;
   display: flex;
   flex-wrap: wrap;
   align-items: center;

@@ -19,6 +19,7 @@ export function CameraView({ isMain }: { isMain: boolean }) {
   const time = useStore((s) => s.time);
   const fly = useView((s) => s.fly);
   const compare = useView((s) => s.compare);
+  const rendering = useView((s) => !!s.render);
   const take = useView((s) => s.takes.find((t) => t.id === s.activeTakeId));
   const path = usePath();
   const { fov, profile } = useCamera();
@@ -71,7 +72,8 @@ export function CameraView({ isMain }: { isMain: boolean }) {
           </div>
         </div>
       )}
-      {isMain && <TakesDrawer />}
+      {/* The REC overlay owns the top of the frame while rendering. */}
+      {isMain && !rendering && <TakesDrawer />}
     </div>
   );
 }

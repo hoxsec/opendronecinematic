@@ -52,6 +52,13 @@ describe('flight sim', () => {
     expect(landed.height).toBeCloseTo(895 + lim.minClearance, 6);
   });
 
+  it('ignores zero or negative time steps instead of producing NaN', () => {
+    for (const dt of [0, -0.004]) {
+      const s = stepDrone(start, NO_INPUT, dt, lim);
+      expect(s).toEqual(start);
+    }
+  });
+
   it('caps diagonal speed at the same top speed', () => {
     const s = fly(start, { forward: 1, right: 1, boost: true }, 10);
     expect(Math.hypot(s.vE, s.vN)).toBeCloseTo(lim.maxSpeed, 3);

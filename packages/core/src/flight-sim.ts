@@ -77,6 +77,9 @@ const approach = (current: number, target: number, maxDelta: number) =>
  * like a real drone in normal (GPS) mode: release the sticks and it brakes to a hover.
  */
 export function stepDrone(s: DroneState, input: FlyInput, dt: number, lim: FlyLimits): DroneState {
+  // Frame timestamps can arrive slightly out of order; a non-positive step must be a no-op
+  // (a negative acceleration budget would otherwise divide 0 by 0 at rest).
+  if (!(dt > 0)) return s;
   const speed = input.boost ? lim.maxSpeed : lim.cruiseSpeed;
   const yaw = wrap360(s.yaw + clamp(input.yaw, -1, 1) * lim.yawRate * dt);
   const pitch = clamp(

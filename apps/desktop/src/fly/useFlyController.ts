@@ -109,7 +109,8 @@ export function useFlyController(
     };
 
     const tick = (now: number) => {
-      const dt = Math.min(0.05, (now - last) / 1000);
+      // rAF timestamps can precede the performance.now() taken when the loop started.
+      const dt = Math.max(0, Math.min(0.05, (now - last) / 1000));
       last = now;
       elapsed += dt;
       const { mission } = st();
