@@ -28,7 +28,8 @@ const HEADER = [
 ];
 
 // Litchi action codes: 0 stay (ms), 1 take photo, 2 start recording, 3 stop recording.
-const actionCode = (a: WaypointAction): [number, number] => {
+// Interval photos are not an action in Litchi but a per-leg column, handled separately.
+const actionCode = (a: WaypointAction): [number, number] | undefined => {
   switch (a.type) {
     case 'hover':
       return [0, Math.round(a.seconds * 1000)];
@@ -38,6 +39,8 @@ const actionCode = (a: WaypointAction): [number, number] => {
       return [2, 0];
     case 'stopRecording':
       return [3, 0];
+    case 'photoDistance':
+      return undefined;
   }
 };
 
@@ -56,9 +59,14 @@ export function exportLitchiCsv(mission: Mission, opts: ExportOptions = {}): Exp
     );
   }
 
+  // photo_distinterval applies to the leg leaving a waypoint, so carry it until it changes.
+  let photoInterval = -1;
   const rows = points.map((p) => {
-    const actions = p.actions.slice(0, MAX_ACTIONS).map(actionCode);
-    if (p.actions.length > MAX_ACTIONS) {
+    for (const a of p.actions)
+      if (a.type === 'photoDistance') photoInterval = a.meters > 0 ? a.meters : -1;
+    const codes = p.actions.map(actionCode).filter((c) => c !== undefined);
+    const actions = codes.slice(0, MAX_ACTIONS);
+    if (codes.length > MAX_ACTIONS) {
       warnings.push(
         `Waypoint ${(p.waypointIndex ?? 0) + 1}: only the first ${MAX_ACTIONS} actions are exported.`,
       );
@@ -88,7 +96,7 @@ export function exportLitchiCsv(mission: Mission, opts: ExportOptions = {}): Exp
       p.poi ? round(poiRelAlt, 1) : 0,
       0,
       -1,
-      -1,
+      photoInterval > 0 ? round(photoInterval, 1) : -1,
     ].join(',');
   });
 

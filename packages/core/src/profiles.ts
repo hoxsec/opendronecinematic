@@ -1,7 +1,7 @@
 import type { Mission } from './mission';
 import { toDeg } from './geo';
 
-export type ExportFormat = 'litchi' | 'dji-kmz' | 'qgc';
+export type ExportFormat = 'litchi' | 'dji-kmz' | 'qgc' | 'mp-waypoints';
 
 export interface DroneProfile {
   id: string;
@@ -168,8 +168,7 @@ export const DRONE_PROFILES: DroneProfile[] = [
     batteryMinutes: 20,
     gimbalPitchMin: -90,
     gimbalPitchMax: 30,
-    exportFormats: ['qgc'],
-    notes: 'QGroundControl .plan export arrives in milestone 2.',
+    exportFormats: ['qgc', 'mp-waypoints'],
   },
   {
     id: 'custom',
@@ -187,7 +186,7 @@ export const DRONE_PROFILES: DroneProfile[] = [
     batteryMinutes: 25,
     gimbalPitchMin: -90,
     gimbalPitchMax: 30,
-    exportFormats: ['litchi', 'dji-kmz', 'qgc'],
+    exportFormats: ['litchi', 'dji-kmz', 'qgc', 'mp-waypoints'],
   },
 ];
 

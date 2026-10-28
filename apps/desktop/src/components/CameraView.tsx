@@ -16,6 +16,7 @@ export function CameraView({ isMain }: { isMain: boolean }) {
   const surfaceRef = useRef<HTMLDivElement>(null);
   const povRef = useRef<PovView | undefined>(undefined);
   const settings = useStore((s) => s.settings);
+  const dem = useStore((s) => s.dem);
   const time = useStore((s) => s.time);
   const fly = useView((s) => s.fly);
   const compare = useView((s) => s.compare);
@@ -37,8 +38,8 @@ export function CameraView({ isMain }: { isMain: boolean }) {
   }, []);
 
   useEffect(() => {
-    povRef.current?.setSources(settings);
-  }, [settings]);
+    povRef.current?.setSources(settings, dem);
+  }, [settings, dem]);
 
   useEffect(() => {
     if (fly) return;

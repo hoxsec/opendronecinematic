@@ -18,7 +18,7 @@ export interface RenderRequest {
  * camera HUD can show a live REC overlay; the result opens in the takes player.
  */
 export async function renderFlight(req: RenderRequest) {
-  const { mission, settings, notify } = useStore.getState();
+  const { mission, settings, dem, notify } = useStore.getState();
   const view = useView.getState();
   if (view.render) return;
   const path = getPath(mission);
@@ -52,6 +52,7 @@ export async function renderFlight(req: RenderRequest) {
       height: req.height,
       horizontalFovDeg: fov,
       settings,
+      dem,
     });
     encoder = await createEncoder(req.format, renderer.canvas, {
       fps: req.fps,

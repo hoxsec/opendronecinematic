@@ -1,4 +1,5 @@
 import type { Geodetic, LatLon } from './geo';
+import type { SurveySpec } from './survey';
 
 /**
  * How waypoint `alt` values are interpreted.
@@ -18,7 +19,9 @@ export type WaypointAction =
   | { type: 'hover'; seconds: number }
   | { type: 'photo' }
   | { type: 'startRecording' }
-  | { type: 'stopRecording' };
+  | { type: 'stopRecording' }
+  /** Take a photo every `meters` from here on; 0 stops interval photos. */
+  | { type: 'photoDistance'; meters: number };
 
 export interface Waypoint {
   id: string;
@@ -81,6 +84,8 @@ export interface Mission {
   waypoints: Waypoint[];
   pois: PointOfInterest[];
   settings: MissionSettings;
+  /** Mapping area and grid parameters, when the mission is (or was generated as) a survey. */
+  survey?: SurveySpec;
 }
 
 export const DEFAULT_SETTINGS: MissionSettings = {

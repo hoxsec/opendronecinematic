@@ -95,6 +95,14 @@ function WaypointEditor({ wp, index }: { wp: Waypoint; index: number }) {
         ...(seconds > 0 ? [{ type: 'hover' as const, seconds }] : []),
       ],
     });
+  const interval = wp.actions.find((a) => a.type === 'photoDistance');
+  const setInterval = (meters: number) =>
+    up({
+      actions: [
+        ...wp.actions.filter((a) => a.type !== 'photoDistance'),
+        { type: 'photoDistance' as const, meters: Math.max(0, meters) },
+      ],
+    });
   const needsPoi = (wp.heading === 'poi' || wp.gimbal === 'poi') && mission.pois.length === 0;
 
   return (
@@ -173,6 +181,17 @@ function WaypointEditor({ wp, index }: { wp: Waypoint; index: number }) {
             min={0}
             suffix="s"
             onChange={setHover}
+          />
+        </Field>
+        <Field
+          label="Photo every"
+          hint="Take a photo every N metres from this waypoint on; 0 stops. Empty = keep the previous setting."
+        >
+          <NumberInput
+            value={interval?.type === 'photoDistance' ? interval.meters : undefined}
+            min={0}
+            suffix="m"
+            onChange={setInterval}
           />
         </Field>
       </div>

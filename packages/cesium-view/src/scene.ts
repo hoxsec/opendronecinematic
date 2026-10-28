@@ -13,6 +13,7 @@ import {
   EllipsoidTerrainProvider,
   Entity,
   HeadingPitchRange,
+  HeightReference,
   Matrix4,
   HorizontalOrigin,
   LabelStyle,
@@ -29,15 +30,20 @@ import {
 } from 'cesium';
 import {
   waypointHeight,
+  type Dem,
   type FlightPath,
   type Geodetic,
   type Mission,
   type SafetyIssue,
 } from '@odc/core';
-import { applySources, type DataSourceSettings } from './sources';
+import { applySources, effectiveSources, type DataSourceSettings } from './sources';
 import { applyPose, type CameraPose } from './pose';
 
-export type PickTarget = { kind: 'waypoint' | 'poi'; id: string } | { kind: 'takeoff' };
+export type PickTarget =
+  | { kind: 'waypoint' | 'poi'; id: string }
+  | { kind: 'takeoff' }
+  /** A corner of the survey outline, by index. */
+  | { kind: 'vertex'; index: number };
 
 export interface SceneEvents {
   /** A click on empty ground/buildings. */
@@ -58,14 +64,20 @@ const COLORS = {
   poi: Color.fromCssColorString('#facc15'),
   takeoff: Color.fromCssColorString('#22c55e'),
   drone: Color.fromCssColorString('#f472b6'),
+  survey: Color.fromCssColorString('#a3e635'),
 };
 
 const ID_SEP = ':';
 const entityId = (t: PickTarget) =>
-  t.kind === 'takeoff' ? 'takeoff' : `${t.kind}${ID_SEP}${t.id}`;
+  t.kind === 'takeoff'
+    ? 'takeoff'
+    : t.kind === 'vertex'
+      ? `vertex${ID_SEP}${t.index}`
+      : `${t.kind}${ID_SEP}${t.id}`;
 function parseId(id: string): PickTarget | undefined {
   if (id === 'takeoff') return { kind: 'takeoff' };
   const [kind, ...rest] = id.split(ID_SEP);
+  if (kind === 'vertex') return { kind, index: Number(rest[0]) };
   if (kind === 'waypoint' || kind === 'poi') return { kind, id: rest.join(ID_SEP) };
   return undefined;
 }
@@ -83,6 +95,7 @@ export class MissionScene {
   private tilesets: Cesium3DTileset[] = [];
   private dragging?: PickTarget;
   private droneEntity?: Entity;
+  private dem?: Dem;
   events: SceneEvents = {};
 
   constructor(container: HTMLElement, hasIonToken: boolean) {
@@ -130,14 +143,16 @@ export class MissionScene {
     );
   }
 
-  async setSources(settings: DataSourceSettings): Promise<string[]> {
+  async setSources(settings: DataSourceSettings, dem?: Dem): Promise<string[]> {
     const { tilesets, errors } = await applySources(
       this.viewer.scene,
       this.viewer.imageryLayers,
       settings,
       this.tilesets,
+      dem,
     );
     this.tilesets = tilesets;
+    this.dem = effectiveSources(settings).terrain === 'geotiff' ? dem : undefined;
     return errors;
   }
 
@@ -219,6 +234,41 @@ export class MissionScene {
     const ents = this.missionLayer.entities;
     ents.suspendEvents();
     ents.removeAll();
+
+    const outline = mission.survey?.polygon ?? [];
+    if (outline.length >= 3) {
+      ents.add({
+        polygon: {
+          hierarchy: Cartesian3.fromDegreesArray(outline.flatMap((p) => [p.lon, p.lat])),
+          material: COLORS.survey.withAlpha(0.18),
+        },
+      });
+    }
+    if (outline.length >= 2) {
+      const ring = outline.length >= 3 ? [...outline, outline[0]!] : outline;
+      ents.add({
+        polyline: {
+          positions: Cartesian3.fromDegreesArray(ring.flatMap((p) => [p.lon, p.lat])),
+          width: 2.5,
+          material: COLORS.survey,
+          clampToGround: true,
+        },
+      });
+    }
+    outline.forEach((p, index) => {
+      ents.add({
+        id: entityId({ kind: 'vertex', index }),
+        position: Cartesian3.fromDegrees(p.lon, p.lat),
+        point: {
+          pixelSize: 10,
+          color: COLORS.survey,
+          outlineColor: Color.BLACK,
+          outlineWidth: 2,
+          heightReference: HeightReference.CLAMP_TO_GROUND,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
+        },
+      });
+    });
 
     const { takeoff } = mission;
     ents.add({
@@ -371,7 +421,11 @@ export class MissionScene {
     const { scene } = this.viewer;
     const carts = () => positions.map((p) => Cartographic.fromDegrees(p.lon, p.lat));
     let terrain: (number | undefined)[] = positions.map(() => 0);
-    if (!(scene.terrainProvider instanceof EllipsoidTerrainProvider)) {
+    const dem = this.dem;
+    if (dem) {
+      // Read the raster directly: exact, synchronous, and independent of loaded tiles.
+      terrain = positions.map((p) => dem.heightAt(p.lat, p.lon));
+    } else if (!(scene.terrainProvider instanceof EllipsoidTerrainProvider)) {
       try {
         terrain = (await sampleTerrainMostDetailed(scene.terrainProvider, carts())).map(
           (c) => c.height,

@@ -1,20 +1,57 @@
 import { useState } from 'react';
-import type {
-  BuildingSource,
-  DataSourceSettings,
-  ImagerySource,
-  TerrainSource,
+import { Dem, type DemGrid } from '@odc/core';
+import {
+  readGeoTiffDem,
+  type BuildingSource,
+  type DataSourceSettings,
+  type ImagerySource,
+  type TerrainSource,
 } from '@odc/cesium-view';
 import { useStore } from '../store';
-import { isTauri, pickLocalTileset } from '../platform';
-import { Field, Select } from './fields';
+import { saveDemFile } from '../demStore';
+import { isTauri, openBinaryFile, pickLocalTileset } from '../platform';
+import { Field, NumberInput, Select } from './fields';
 
 export function SettingsDialog({ onClose }: { onClose: () => void }) {
   const current = useStore((s) => s.settings);
+  const dem = useStore((s) => s.dem);
   const [draft, setDraft] = useState<DataSourceSettings>(current);
   const [url, setUrl] = useState('');
+  const [grid, setGrid] = useState<DemGrid | undefined>(dem?.grid);
+  const [demError, setDemError] = useState<string>();
+  const [loadingDem, setLoadingDem] = useState(false);
   const up = (patch: Partial<DataSourceSettings>) => setDraft((d) => ({ ...d, ...patch }));
   const hasToken = draft.ionToken.trim().length > 0;
+
+  const loadGeoTiff = async () => {
+    const file = await openBinaryFile([{ name: 'GeoTIFF elevation', extensions: ['tif', 'tiff'] }]);
+    if (!file) return;
+    setLoadingDem(true);
+    setDemError(undefined);
+    try {
+      const buffer = file.data.slice().buffer;
+      // Decode first so a bad file is reported here instead of on the next startup.
+      setGrid(await readGeoTiffDem(buffer));
+      await saveDemFile(buffer);
+      up({ terrain: 'geotiff', demName: file.name });
+    } catch (e) {
+      setDemError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingDem(false);
+    }
+  };
+
+  const apply = () => {
+    const st = useStore.getState();
+    if (grid && (grid !== dem?.grid || draft.demOffset !== dem.offset)) {
+      st.setDem(new Dem(grid, draft.demOffset));
+    }
+    st.setSettings(draft);
+    onClose();
+  };
+
+  const terrain = hasToken || draft.terrain === 'geotiff' ? draft.terrain : 'none';
+  const bounds = grid && new Dem(grid).bounds;
 
   const addTileset = (u: string) => {
     if (u && !draft.customTilesets.includes(u))
@@ -52,12 +89,13 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
           </Field>
           <Field label="Terrain">
             <Select<TerrainSource>
-              value={hasToken ? draft.terrain : 'none'}
+              value={terrain}
               options={[
                 { value: 'ion', label: 'Cesium World Terrain' },
+                { value: 'geotiff', label: 'GeoTIFF DEM (local)' },
                 { value: 'none', label: 'Flat (ellipsoid)' },
               ]}
-              onChange={(terrain) => up({ terrain })}
+              onChange={(t) => up({ terrain: t })}
             />
           </Field>
           <Field label="3D buildings">
@@ -72,6 +110,43 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
             />
           </Field>
         </div>
+
+        {terrain === 'geotiff' && (
+          <>
+            <h3>GeoTIFF terrain</h3>
+            <p className="muted small">
+              A single-band elevation GeoTIFF (SRTM, Copernicus DEM, national lidar, a
+              photogrammetry DSM) in WGS84, Web Mercator or UTM. It works offline and is used for
+              the terrain safety checks and survey terrain following.
+            </p>
+            <div className="button-row">
+              <span className="mono ellipsis">
+                {draft.demName && grid ? draft.demName : 'No file loaded'}
+              </span>
+              <button onClick={loadGeoTiff} disabled={loadingDem}>
+                {loadingDem ? 'Reading…' : 'Load GeoTIFF…'}
+              </button>
+            </div>
+            {grid && bounds && (
+              <p className="muted small mono">
+                {grid.width}×{grid.height} px · {bounds.south.toFixed(4)}…{bounds.north.toFixed(4)}
+                °N, {bounds.west.toFixed(4)}…{bounds.east.toFixed(4)}°E
+              </p>
+            )}
+            {demError && <p className="note">{demError}</p>}
+            <Field
+              label="Height offset"
+              hint="Added to every DEM height. Most DEMs are above sea level: enter the geoid height for the area (e.g. ~48 m in central Europe, ~-30 m in California) to get WGS84 heights."
+            >
+              <NumberInput
+                value={draft.demOffset}
+                step={0.5}
+                suffix="m"
+                onChange={(demOffset) => up({ demOffset })}
+              />
+            </Field>
+          </>
+        )}
 
         <h3>Your own 3D Tiles</h3>
         <p className="muted small">Photogrammetry or scans exported as 3D Tiles (tileset.json).</p>
@@ -109,13 +184,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
 
         <div className="button-row end">
           <button onClick={onClose}>Cancel</button>
-          <button
-            className="primary"
-            onClick={() => {
-              useStore.getState().setSettings(draft);
-              onClose();
-            }}
-          >
+          <button className="primary" disabled={terrain === 'geotiff' && !grid} onClick={apply}>
             Apply
           </button>
         </div>

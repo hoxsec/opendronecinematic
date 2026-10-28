@@ -8,7 +8,7 @@ import {
   type Cesium3DTileset,
   type Scene,
 } from 'cesium';
-import type { Geodetic } from '@odc/core';
+import type { Dem, Geodetic } from '@odc/core';
 import { applySources, type DataSourceSettings } from './sources';
 import { applyPose, type CameraPose } from './pose';
 
@@ -32,12 +32,13 @@ export class PovView {
     scene.screenSpaceCameraController.enableInputs = false;
   }
 
-  async setSources(settings: DataSourceSettings) {
+  async setSources(settings: DataSourceSettings, dem?: Dem) {
     const { tilesets, errors } = await applySources(
       this.widget.scene,
       this.widget.imageryLayers,
       settings,
       this.tilesets,
+      dem,
     );
     this.tilesets = tilesets;
     return errors;

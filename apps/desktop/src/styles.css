@@ -377,7 +377,8 @@ input[type='range'] {
 }
 .globe.mode-addWaypoint,
 .globe.mode-addPoi,
-.globe.mode-setTakeoff {
+.globe.mode-setTakeoff,
+.globe.mode-drawSurvey {
   cursor: crosshair;
 }
 .globe .cesium-viewer-bottom {
