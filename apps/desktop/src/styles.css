@@ -130,6 +130,31 @@ input[type='range'] {
   display: flex;
   gap: 4px;
 }
+.zoom-menu {
+  position: relative;
+}
+.zoom-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: 8px;
+  width: 230px;
+  padding: 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.zoom-pop input[type='range'] {
+  width: 100%;
+}
+.zoom-pop label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .toolbar .segmented button {
   border-radius: 0;
 }
@@ -415,6 +440,26 @@ input[type='range'] {
 .pane.is-mini .cesium-viewer-bottom,
 .pane.is-mini .cesium-widget-credits {
   display: none !important;
+}
+/* Split layout: both views side by side (or stacked) with a draggable divider. */
+.split-divider {
+  position: absolute;
+  z-index: 6;
+  background: var(--border);
+  transition: background 0.15s;
+}
+.split-divider:hover {
+  background: var(--accent);
+}
+.split-divider.row {
+  top: 0;
+  bottom: 0;
+  cursor: col-resize;
+}
+.split-divider.column {
+  left: 0;
+  right: 0;
+  cursor: row-resize;
 }
 .mini-chrome {
   position: absolute;
@@ -861,4 +906,64 @@ input[type='range'] {
 }
 .toast.error {
   border-color: var(--danger);
+}
+
+/* Light panel: the shoot day as coloured light phases. */
+.day-strip {
+  position: relative;
+  height: 18px;
+  margin: 4px 0 18px;
+  border-radius: 4px;
+  overflow: visible;
+  cursor: pointer;
+  background: #0f172a;
+}
+.day-strip .phase {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.day-strip .phase.night {
+  background: #0f172a;
+}
+.day-strip .phase.blue {
+  background: #3b5bdb;
+}
+.day-strip .phase.golden {
+  background: #f59e0b;
+}
+.day-strip .phase.day {
+  background: #7dd3fc;
+}
+.day-strip .mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  margin-left: -1px;
+  pointer-events: none;
+}
+.day-strip .mark.start {
+  background: var(--text);
+}
+.day-strip .mark.now {
+  background: var(--poi);
+}
+.day-strip .ticks span {
+  position: absolute;
+  top: 20px;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--muted);
+}
+.day-strip .ticks span:first-child {
+  transform: none;
+}
+.day-strip .ticks span:last-child {
+  transform: translateX(-100%);
+}
+.sun-hints {
+  margin: 0 0 6px;
+  padding-left: 16px;
+  color: var(--muted);
 }

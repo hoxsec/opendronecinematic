@@ -15,7 +15,7 @@ import {
   type PickTarget,
 } from '@odc/cesium-view';
 import { useStore } from '../store';
-import { getPath, useCamera, usePath } from '../derived';
+import { getPath, useCamera, usePath, useSunTime } from '../derived';
 import { useView } from '../viewStore';
 
 /** Exposed so other panels (shot templates) can sample ground heights. */
@@ -33,6 +33,8 @@ export function GlobeView() {
   const focusToken = useStore((s) => s.focusToken);
   const mode = useStore((s) => s.mode);
   const fly = useView((s) => s.fly);
+  const zoom = useView((s) => s.zoom);
+  const sunTime = useSunTime().getTime();
   const path = usePath();
   const { fov, profile } = useCamera();
 
@@ -73,6 +75,14 @@ export function GlobeView() {
       cancelled = true;
     };
   }, [settings, dem]);
+
+  useEffect(() => {
+    sceneRef.current?.setZoom(zoom.speed, zoom.snappy);
+  }, [zoom]);
+
+  useEffect(() => {
+    sceneRef.current?.setSun(new Date(sunTime));
+  }, [sunTime]);
 
   // Mouse interaction, routed by the current tool mode.
   useEffect(() => {

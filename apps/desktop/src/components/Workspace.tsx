@@ -15,19 +15,26 @@ const MODE_HINT = {
 
 const MAP_MINI_ASPECT = 16 / 10;
 const MIN_WIDTH = 220;
+/** Width of the split divider, CSS px. */
+const DIVIDER = 6;
 
 /**
- * Hosts the map and the camera view. One fills the main area and the other floats as a
- * draggable, resizable mini-screen; clicking the mini-screen (or pressing Tab) swaps them.
+ * Hosts the map and the camera view. In 'pip' layout one fills the main area and the other floats
+ * as a draggable, resizable mini-screen; clicking the mini-screen (or pressing Tab) swaps them.
+ * In 'split' layout they share the area with a draggable divider, the main view first.
  * Both stay mounted so their WebGL globes and loaded tiles survive the swap.
  */
 export function Workspace() {
   const areaRef = useRef<HTMLDivElement>(null);
   const main = useView((s) => s.main);
   const mini = useView((s) => s.mini);
+  const layout = useView((s) => s.layout);
+  const splitDir = useView((s) => s.splitDir);
+  const split = useView((s) => s.split);
   const fly = useView((s) => s.fly);
   const mode = useStore((s) => s.mode);
   const { profile } = useCamera();
+  const isSplit = layout === 'split';
 
   const miniKind: MainView = main === 'map' ? 'camera' : 'map';
   const aspect = miniKind === 'camera' ? profile.videoAspect : MAP_MINI_ASPECT;
@@ -60,48 +67,90 @@ export function Workspace() {
       bottom = Math.max(0, Math.min(area.height - height, bottom));
       useView.getState().setMini({ right, bottom, width });
     };
-    const up = () => {
-      window.removeEventListener('pointermove', move);
-      window.removeEventListener('pointerup', up);
-    };
     window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
+    window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), {
+      once: true,
+    });
+  };
+
+  const dragDivider = (e: ReactPointerEvent) => {
+    e.preventDefault();
+    const area = areaRef.current!.getBoundingClientRect();
+    const move = (m: PointerEvent) =>
+      useView
+        .getState()
+        .setSplit(
+          splitDir === 'row'
+            ? (m.clientX - area.left) / area.width
+            : (m.clientY - area.top) / area.height,
+        );
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', () => window.removeEventListener('pointermove', move), {
+      once: true,
+    });
+  };
+
+  /** Where a view sits in split layout: the main view takes the first `split` of the area. */
+  const splitStyle = (kind: MainView): CSSProperties => {
+    const first = kind === main;
+    const size = first
+      ? `calc(${split * 100}% - ${DIVIDER / 2}px)`
+      : `calc(${(1 - split) * 100}% - ${DIVIDER / 2}px)`;
+    return splitDir === 'row'
+      ? { top: 0, bottom: 0, width: size, [first ? 'left' : 'right']: 0 }
+      : { left: 0, right: 0, height: size, [first ? 'top' : 'bottom']: 0 };
   };
 
   const paneClass = (kind: MainView) =>
-    `pane pane-${kind} ${kind === main ? 'is-main' : 'is-mini'}`;
-  const paneStyle = (kind: MainView) => (kind === main ? undefined : miniStyle);
+    `pane pane-${kind} ${isSplit ? 'is-split' : kind === main ? 'is-main' : 'is-mini'}`;
+  const paneStyle = (kind: MainView) =>
+    isSplit ? splitStyle(kind) : kind === main ? undefined : miniStyle;
+  const mapVisible = isSplit || main === 'map';
 
   return (
     <main className="main" ref={areaRef}>
       <div className={paneClass('map')} style={paneStyle('map')}>
         <GlobeView />
-        {main === 'map' && MODE_HINT[mode] && <div className="mode-hint">{MODE_HINT[mode]}</div>}
+        {mapVisible && MODE_HINT[mode] && <div className="mode-hint">{MODE_HINT[mode]}</div>}
       </div>
       <div className={paneClass('camera')} style={paneStyle('camera')}>
-        <CameraView isMain={main === 'camera'} />
+        <CameraView isMain={isSplit || main === 'camera'} />
       </div>
-      {/* Chrome layered over whichever pane is mini. */}
-      <div className="mini-chrome" style={miniStyle}>
+      {isSplit ? (
         <div
-          className="mini-swap"
-          title={fly ? 'Map (fly mode keeps the camera main)' : 'Click or press Tab to swap'}
-          onClick={() => !fly && useView.getState().swap()}
+          className={`split-divider ${splitDir}`}
+          style={
+            splitDir === 'row'
+              ? { left: `calc(${split * 100}% - ${DIVIDER / 2}px)`, width: DIVIDER }
+              : { top: `calc(${split * 100}% - ${DIVIDER / 2}px)`, height: DIVIDER }
+          }
+          onPointerDown={dragDivider}
+          onDoubleClick={() => useView.getState().setSplit(0.5)}
+          title="Drag to resize · double-click to centre"
         />
-        <div className="mini-bar" onPointerDown={(e) => drag(e, 'move')}>
-          <span>{miniKind === 'map' ? 'Map' : 'Camera'}</span>
-          {!fly && (
-            <button
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => useView.getState().swap()}
-              title="Swap (Tab)"
-            >
-              ⇄
-            </button>
-          )}
+      ) : (
+        /* Chrome layered over whichever pane is mini. */
+        <div className="mini-chrome" style={miniStyle}>
+          <div
+            className="mini-swap"
+            title={fly ? 'Map (fly mode keeps the camera main)' : 'Click or press Tab to swap'}
+            onClick={() => !fly && useView.getState().swap()}
+          />
+          <div className="mini-bar" onPointerDown={(e) => drag(e, 'move')}>
+            <span>{miniKind === 'map' ? 'Map' : 'Camera'}</span>
+            {!fly && (
+              <button
+                onPointerDown={(e) => e.stopPropagation()}
+                onClick={() => useView.getState().swap()}
+                title="Swap (Tab)"
+              >
+                ⇄
+              </button>
+            )}
+          </div>
+          <div className="mini-resize" onPointerDown={(e) => drag(e, 'resize')} title="Resize" />
         </div>
-        <div className="mini-resize" onPointerDown={(e) => drag(e, 'resize')} title="Resize" />
-      </div>
+      )}
     </main>
   );
 }

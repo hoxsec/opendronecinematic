@@ -41,19 +41,20 @@
 
 ## ✨ Features
 
-| Feature                        | What it does                                                                                                      |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
-| 🌍 **Plan on a real 3D globe** | Cesium World Terrain, aerial imagery, OSM Buildings, Google Photorealistic 3D Tiles, or your own photogrammetry.  |
-| 🎯 **Aim the camera exactly**  | Points of interest, heading and gimbal modes per waypoint, smooth easing between them.                            |
-| 🎥 **See what the drone sees** | A live camera view using the drone's real field of view. Swap it with the map at any time.                        |
-| 🕹️ **Fly mode**                | Fly a simulated drone with keyboard, mouse or gamepad. Drop waypoints, mark POIs, or record a flight path.        |
-| 🎬 **Shot templates**          | Orbit, helix, reveal, dolly, fly-by and dronie, generated around a subject in one click.                          |
-| 🗺️ **Survey grids**            | Draw an area, set height and overlap, get a lawnmower grid with GSD, photo count and distance-triggered photos.   |
-| 🛡️ **Safety checks**           | Terrain and building clearance, 120 m ceiling, range, speed, climb rate and battery.                              |
-| 📤 **Export to your drone**    | Litchi CSV, DJI WPML/KMZ, QGroundControl `.plan` and Mission Planner, with an option to match the preview.        |
-| 📥 **Import missions**         | Open Litchi CSV, DJI KMZ, QGC `.plan` and Mission Planner files to preview, edit and re-export them.              |
-| ⛰️ **GeoTIFF terrain**         | Load your own elevation model (SRTM, Copernicus, lidar) for offline terrain, safety checks and terrain following. |
-| 🎞️ **Render previz video**     | Frame-exact MP4, WebM or GIF at up to 4K. Compare takes side by side with the live view.                          |
+| Feature                        | What it does                                                                                                                |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| 🌍 **Plan on a real 3D globe** | Cesium World Terrain, aerial imagery, OSM Buildings, Google Photorealistic 3D Tiles, or your own photogrammetry.            |
+| 🎯 **Aim the camera exactly**  | Points of interest, heading and gimbal modes per waypoint, smooth easing between them.                                      |
+| 🎥 **See what the drone sees** | A live camera view using the drone's real field of view. Swap it with the map at any time.                                  |
+| ☀️ **Sun and golden hour**     | Real sun lighting and shadows for the shoot date and time, golden and blue hour on a day strip, and the light on your shot. |
+| 🕹️ **Fly mode**                | Fly a simulated drone with keyboard, mouse or gamepad. Drop waypoints, mark POIs, or record a flight path.                  |
+| 🎬 **Shot templates**          | Orbit, helix, reveal, dolly, fly-by and dronie, generated around a subject in one click.                                    |
+| 🗺️ **Survey grids**            | Draw an area, set height and overlap, get a lawnmower grid with GSD, photo count and distance-triggered photos.             |
+| 🛡️ **Safety checks**           | Terrain and building clearance, 120 m ceiling, range, speed, climb rate and battery.                                        |
+| 📤 **Export to your drone**    | Litchi CSV, DJI WPML/KMZ, QGroundControl `.plan` and Mission Planner, with an option to match the preview.                  |
+| 📥 **Import missions**         | Open Litchi CSV, DJI KMZ, QGC `.plan` and Mission Planner files to preview, edit and re-export them.                        |
+| ⛰️ **GeoTIFF terrain**         | Load your own elevation model (SRTM, Copernicus, lidar) for offline terrain, safety checks and terrain following.           |
+| 🎞️ **Render previz video**     | Frame-exact MP4, WebM or GIF at up to 4K. Compare takes side by side with the live view.                                    |
 
 ---
 
@@ -105,11 +106,23 @@ The POI tracking is computed for every frame of the flight, not only at the wayp
 
 <img src="docs/images/camera-view.webp" alt="Camera view as the main screen with the HUD, and the map as a mini-screen" width="100%">
 
-The **camera view** renders exactly what the drone camera will record. It uses the profile's horizontal field of view (72° for a 24 mm-equivalent lens), the video's 16:9 frame, and a rule-of-thirds overlay. The HUD shows heading, gimbal, speed, altitude, height above ground, distance from home and FOV.
+The **camera view** renders exactly what the drone camera will record. It uses the profile's horizontal field of view (72° for a 24 mm-equivalent lens), the video's 16:9 frame, and a rule-of-thirds overlay. The HUD shows heading, gimbal, speed, altitude, height above ground, distance from home, FOV and the sun (its height, and whether the shot is backlit, front-lit or side-lit, or the sun is in frame).
 
 - Press **Tab**, click the mini-screen, or use **🎥 Camera view / 🗺 Map view** to swap the main screen and the mini-screen.
 - Drag the mini-screen's top bar to move it, and its top-left corner to resize it. The layout is remembered.
+- Press **L** or **▣ Mini-screen / ◫ Split** to show the map and camera side by side. **⬌ / ⬍** stacks them instead; drag the divider to resize, double-click it to centre.
+- **🔍** sets the map's mouse-wheel zoom speed (slow, normal, fast or anything between), and **Snappy** stops the zoom as soon as the wheel stops.
 - Press **Space** or ▶ to play the flight, and scrub the timeline. The numbered ticks on the timeline jump to each waypoint.
+
+#### Light and time of day
+
+The **Light** panel sets the shoot date, takeoff time and the location's UTC offset, saved with the mission (a new mission starts at today's evening golden hour). The map, the camera view and rendered video are lit by the real sun for that moment, and the sun moves as the timeline plays. The camera view and renders also draw shadows from terrain, buildings and 3D tiles; turn them off in the panel on slower machines.
+
+- The **day strip** shows night, blue hour, golden hour and daylight; click it to set the takeoff time. The white mark is takeoff, the yellow mark the timeline cursor.
+- 🌅, 🌇 and 🌆 jump to the morning golden hour, evening golden hour and blue hour (hover for their times).
+- For each golden hour the panel says how the light falls on the shot, from the way the camera mostly faces: front-lit, backlit or side light.
+
+Golden hour is when the sun is between 4° below and 6° above the horizon; blue hour from 6° to 4° below.
 
 ### 4. Fly mode: plan by flying
 
@@ -298,14 +311,14 @@ npm run tauri build
 
 ## ⌨️ Keyboard shortcuts
 
-| Key   | Action        | Key                 | Action            |
-| ----- | ------------- | ------------------- | ----------------- |
-| `V`   | Select tool   | `Space`             | Play / pause      |
-| `W`   | Add waypoints | `Tab`               | Swap camera / map |
-| `P`   | Add POI       | `F`                 | Fly mode          |
-| `T`   | Set takeoff   | `Del`               | Delete selected   |
-| `G`   | Draw survey   |                     |                   |
-| `Esc` | Cancel / exit | `Ctrl+Z` / `Ctrl+Y` | Undo / redo       |
+| Key   | Action        | Key                 | Action              |
+| ----- | ------------- | ------------------- | ------------------- |
+| `V`   | Select tool   | `Space`             | Play / pause        |
+| `W`   | Add waypoints | `Tab`               | Swap camera / map   |
+| `P`   | Add POI       | `F`                 | Fly mode            |
+| `T`   | Set takeoff   | `Del`               | Delete selected     |
+| `G`   | Draw survey   | `L`                 | Split / mini-screen |
+| `Esc` | Cancel / exit | `Ctrl+Z` / `Ctrl+Y` | Undo / redo         |
 
 ---
 

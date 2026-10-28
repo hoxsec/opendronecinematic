@@ -10,3 +10,4 @@ export * from './flight-sim';
 export * from './track';
 export * from './survey';
 export * from './dem';
+export * from './sun';
