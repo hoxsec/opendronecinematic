@@ -10,6 +10,7 @@ import {
   ConstantPositionProperty,
   CustomDataSource,
   DebugCameraPrimitive,
+  DistanceDisplayCondition,
   EllipsoidTerrainProvider,
   Entity,
   HeadingPitchRange,
@@ -26,7 +27,6 @@ import {
   VerticalOrigin,
   Viewer,
   defined,
-  sampleTerrainMostDetailed,
 } from 'cesium';
 import {
   waypointHeight,
@@ -36,7 +36,14 @@ import {
   type Mission,
   type SafetyIssue,
 } from '@odc/core';
-import { applySources, effectiveSources, type DataSourceSettings } from './sources';
+import { OBSTACLE_LABELS, isAirfield, type Obstacle } from '@odc/core';
+import {
+  applySources,
+  effectiveSources,
+  type AppliedSources,
+  type DataSourceSettings,
+} from './sources';
+import { sampleTerrainHeights } from './terrain';
 import { applyPose, type CameraPose } from './pose';
 
 export type PickTarget =
@@ -65,6 +72,8 @@ const COLORS = {
   takeoff: Color.fromCssColorString('#22c55e'),
   drone: Color.fromCssColorString('#f472b6'),
   survey: Color.fromCssColorString('#a3e635'),
+  obstacle: Color.fromCssColorString('#f87171'),
+  airfield: Color.fromCssColorString('#a78bfa'),
 };
 
 const ID_SEP = ':';
@@ -89,10 +98,12 @@ export class MissionScene {
   readonly viewer: Viewer;
   private readonly missionLayer = new CustomDataSource('mission');
   private readonly droneLayer = new CustomDataSource('drone');
+  private readonly obstacleLayer = new CustomDataSource('obstacles');
   private readonly handler: ScreenSpaceEventHandler;
   private readonly frustumCamera: Camera;
   private frustum?: DebugCameraPrimitive;
-  private tilesets: Cesium3DTileset[] = [];
+  private applied?: AppliedSources;
+  private sourcesQueue: Promise<unknown> = Promise.resolve();
   private dragging?: PickTarget;
   private droneEntity?: Entity;
   private dem?: Dem;
@@ -118,6 +129,7 @@ export class MissionScene {
     scene.globe.enableLighting = false;
     this.viewer.dataSources.add(this.missionLayer);
     this.viewer.dataSources.add(this.droneLayer);
+    this.viewer.dataSources.add(this.obstacleLayer);
 
     this.frustumCamera = new Camera(scene);
     this.frustumCamera.frustum = new PerspectiveFrustum({
@@ -143,23 +155,35 @@ export class MissionScene {
     );
   }
 
-  async setSources(settings: DataSourceSettings, dem?: Dem): Promise<string[]> {
-    const { tilesets, errors } = await applySources(
-      this.viewer.scene,
-      this.viewer.imageryLayers,
-      settings,
-      this.tilesets,
-      dem,
-    );
-    this.tilesets = tilesets;
-    this.dem = effectiveSources(settings).terrain === 'geotiff' ? dem : undefined;
-    return errors;
+  /** Apply data sources. Calls run one after another so overlapping changes can't interleave. */
+  setSources(settings: DataSourceSettings, dem?: Dem): Promise<string[]> {
+    const run = this.sourcesQueue.then(async () => {
+      if (this.viewer.isDestroyed()) return [];
+      this.applied = await applySources(
+        this.viewer.scene,
+        this.viewer.imageryLayers,
+        settings,
+        this.applied,
+        dem,
+      );
+      this.dem = effectiveSources(settings).terrain === 'geotiff' ? dem : undefined;
+      return this.applied.errors;
+    });
+    this.sourcesQueue = run.catch(() => {});
+    return run;
   }
 
-  /** Look at a location from the south at an oblique angle. duration 0 jumps instantly. */
-  flyTo(lat: number, lon: number, range = 600, duration = 1.5) {
+  /**
+   * Look at a location from the south at an oblique angle. `groundHeight` (ellipsoid) keeps the
+   * camera above high terrain. duration 0 jumps instantly.
+   */
+  flyTo(lat: number, lon: number, range = 600, duration = 1.5, groundHeight = 0) {
     const view = {
-      destination: Cartesian3.fromDegrees(lon, lat - range / 111_000 / 1.2, range * 0.6),
+      destination: Cartesian3.fromDegrees(
+        lon,
+        lat - range / 111_000 / 1.2,
+        groundHeight + range * 0.6,
+      ),
       orientation: { heading: 0, pitch: CMath.toRadians(-35), roll: 0 },
     };
     if (duration === 0) this.viewer.camera.setView(view);
@@ -173,7 +197,8 @@ export class MissionScene {
     let c: Cartesian3 | undefined;
     if (
       defined(picked) &&
-      picked.primitive instanceof Cesium3DTileset &&
+      (picked.primitive instanceof Cesium3DTileset ||
+        this.applied?.buildings?.owns(picked.primitive)) &&
       scene.pickPositionSupported
     ) {
       c = scene.pickPosition(pos);
@@ -361,6 +386,69 @@ export class MissionScene {
     this.viewer.scene.requestRender();
   }
 
+  /**
+   * Draw mapped obstacles: a red mast from the ground to the top of each point obstacle, power
+   * lines at their height, and airfields as labelled markers. `ground[i]` is the terrain height
+   * under each obstacle's first point.
+   */
+  setObstacles(obstacles: Obstacle[], ground: (number | undefined)[]) {
+    const ents = this.obstacleLayer.entities;
+    ents.suspendEvents();
+    ents.removeAll();
+    obstacles.forEach((o, i) => {
+      const base = ground[i] ?? 0;
+      const [lon, lat] = o.coords[0]!;
+      const name = o.name ?? OBSTACLE_LABELS[o.kind];
+      if (isAirfield(o)) {
+        ents.add({
+          position: Cartesian3.fromDegrees(lon, lat, base),
+          point: {
+            pixelSize: 9,
+            color: COLORS.airfield,
+            outlineColor: Color.BLACK,
+            outlineWidth: 1,
+          },
+          label: { ...label(`✈ ${name}`, COLORS.airfield), scale: 0.85 },
+        });
+        return;
+      }
+      const top = base + o.height;
+      if (o.coords.length > 1) {
+        ents.add({
+          polyline: {
+            positions: o.coords.map(([x, y]) => Cartesian3.fromDegrees(x, y, top)),
+            width: 2,
+            material: COLORS.obstacle.withAlpha(0.8),
+            arcType: ArcType.NONE,
+          },
+        });
+        return;
+      }
+      ents.add({
+        polyline: {
+          positions: [
+            Cartesian3.fromDegrees(lon, lat, base),
+            Cartesian3.fromDegrees(lon, lat, top),
+          ],
+          width: 3,
+          material: COLORS.obstacle,
+          arcType: ArcType.NONE,
+        },
+      });
+      ents.add({
+        position: Cartesian3.fromDegrees(lon, lat, top),
+        point: { pixelSize: 6, color: COLORS.obstacle },
+        label: {
+          ...label(`${name} ${Math.round(o.height)} m`, COLORS.obstacle),
+          scale: 0.75,
+          distanceDisplayCondition: new DistanceDisplayCondition(0, 2500),
+        },
+      });
+    });
+    ents.resumeEvents();
+    this.viewer.scene.requestRender();
+  }
+
   /** Show the drone and its camera frustum at a pose (path sample or live fly-mode state). */
   setDrone(pose: CameraPose | undefined, horizontalFovDeg: number, aspect: number) {
     if (!pose) {
@@ -414,37 +502,46 @@ export class MissionScene {
   }
 
   /**
-   * Ellipsoid height of whatever lies beneath each position: the max of terrain and any 3D tiles,
-   * so buildings count as obstacles. Undefined where nothing could be sampled.
+   * Ellipsoid height of whatever lies beneath each position: the max of terrain, 3D tiles and
+   * offline buildings, so buildings count as obstacles. Undefined where nothing could be sampled.
    */
   async sampleGround(positions: { lat: number; lon: number }[]): Promise<(number | undefined)[]> {
     const { scene } = this.viewer;
     const carts = () => positions.map((p) => Cartographic.fromDegrees(p.lon, p.lat));
-    let terrain: (number | undefined)[] = positions.map(() => 0);
+    let ground: (number | undefined)[] = positions.map(() => 0);
     const dem = this.dem;
     if (dem) {
       // Read the raster directly: exact, synchronous, and independent of loaded tiles.
-      terrain = positions.map((p) => dem.heightAt(p.lat, p.lon));
+      ground = positions.map((p) => dem.heightAt(p.lat, p.lon));
     } else if (!(scene.terrainProvider instanceof EllipsoidTerrainProvider)) {
       try {
-        terrain = (await sampleTerrainMostDetailed(scene.terrainProvider, carts())).map(
-          (c) => c.height,
-        );
+        ground = await sampleTerrainHeights(scene.terrainProvider, carts());
       } catch {
-        terrain = positions.map(() => undefined);
+        ground = positions.map(() => undefined);
       }
     }
-    if (this.tilesets.length === 0 || !scene.sampleHeightSupported) return terrain;
+    const max = (h: number | undefined, t: number | undefined) =>
+      t === undefined || Number.isNaN(t) ? h : h === undefined ? t : Math.max(h, t);
+
+    const buildings = this.applied?.buildings;
+    if (buildings) {
+      await buildings.ensure(positions);
+      ground = ground.map((h, i) =>
+        max(h, buildings.heightAt(positions[i]!.lat, positions[i]!.lon)),
+      );
+    }
+    const tilesets = this.applied?.tilesets ?? [];
+    if (tilesets.length === 0 || !scene.sampleHeightSupported) return ground;
     try {
-      const exclude = [...this.missionLayer.entities.values, ...this.droneLayer.entities.values];
+      const exclude = [
+        ...this.missionLayer.entities.values,
+        ...this.droneLayer.entities.values,
+        ...this.obstacleLayer.entities.values,
+      ];
       const tiles = await scene.sampleHeightMostDetailed(carts(), exclude);
-      return terrain.map((h, i) => {
-        const t = tiles[i]?.height;
-        if (t === undefined || Number.isNaN(t)) return h;
-        return h === undefined ? t : Math.max(h, t);
-      });
+      return ground.map((h, i) => max(h, tiles[i]?.height));
     } catch {
-      return terrain;
+      return ground;
     }
   }
 

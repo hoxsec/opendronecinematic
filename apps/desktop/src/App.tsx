@@ -13,11 +13,39 @@ import { SafetyPanel } from './components/SafetyPanel';
 import { ExportDialog } from './components/ExportDialog';
 import { SettingsDialog } from './components/SettingsDialog';
 import { RenderDialog } from './components/RenderDialog';
+import { resetLocalTiles } from '@odc/cesium-view';
+import { canDownload, localServerUrl, useLocalData, watchDownloads } from './localData';
 
 export function App() {
   const [dialog, setDialog] = useState<'export' | 'settings' | 'render' | undefined>();
   const toast = useStore((s) => s.toast);
-  const hasToken = useStore((s) => s.settings.ionToken.trim().length > 0);
+  const needsBuildings = useStore(
+    (s) => !s.settings.ionToken.trim() && s.settings.buildings !== 'local',
+  );
+
+  useEffect(() => {
+    // The desktop tile server falls back to another port if the usual one is taken.
+    if (!canDownload()) return;
+    localServerUrl()
+      .then((serverUrl) => {
+        const { settings, setSettings } = useStore.getState();
+        if (settings.local.serverUrl !== serverUrl)
+          setSettings({ local: { ...settings.local, serverUrl } });
+      })
+      .catch(() => {});
+    watchDownloads((p) => {
+      const { settings, notify, setSettings } = useStore.getState();
+      useLocalData.getState().refresh(settings.local.serverUrl);
+      if (p.stage === 'done') {
+        notify(`${p.id}: offline data ready`);
+        // Re-apply sources so a region that was just updated is reloaded.
+        if (settings.local.region === p.key) {
+          resetLocalTiles();
+          setSettings({ local: { ...settings.local } });
+        }
+      } else if (p.stage === 'error') notify(`${p.id}: ${p.message}`, 'error');
+    });
+  }, []);
 
   useEffect(() => {
     // Fly mode captures its own keys (capture phase) before this handler sees them.
@@ -61,9 +89,9 @@ export function App() {
     <div className="app">
       <Toolbar onExport={() => setDialog('export')} onSettings={() => setDialog('settings')} />
       <aside className="sidebar">
-        {!hasToken && (
+        {needsBuildings && (
           <div className="banner" onClick={() => setDialog('settings')}>
-            Add a free Cesium ion token for 3D terrain and buildings →
+            Add a free Cesium ion token or download a country for 3D buildings →
           </div>
         )}
         <MissionPanel />

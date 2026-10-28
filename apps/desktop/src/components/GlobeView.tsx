@@ -1,6 +1,19 @@
 import { useEffect, useRef } from 'react';
-import { evaluateSafety, waypointHeight, altFromHeight } from '@odc/core';
-import { MissionScene, effectiveSources, type PickTarget } from '@odc/cesium-view';
+import {
+  evaluateSafety,
+  waypointHeight,
+  altFromHeight,
+  AIRFIELD_RADIUS,
+  type Obstacle,
+} from '@odc/core';
+import {
+  MissionScene,
+  effectiveSources,
+  fetchObstacles,
+  hasRequirement,
+  type DataSourceSettings,
+  type PickTarget,
+} from '@odc/cesium-view';
 import { useStore } from '../store';
 import { getPath, useCamera, usePath } from '../derived';
 import { useView } from '../viewStore';
@@ -30,7 +43,7 @@ export function GlobeView() {
     if (import.meta.env.DEV) Object.assign(window, { odcScene: scene });
     const m = useStore.getState().mission;
     const first = m.waypoints[0] ?? m.takeoff;
-    scene.flyTo(first.lat, first.lon, 1500, 0);
+    scene.flyTo(first.lat, first.lon, 1500, 0, first.groundHeight);
     return () => {
       activeScene = undefined;
       scene.destroy();
@@ -136,7 +149,7 @@ export function GlobeView() {
     if (focusToken === 0) return;
     const m = useStore.getState().mission;
     const first = m.waypoints[0] ?? m.takeoff;
-    sceneRef.current?.flyTo(first.lat, first.lon);
+    sceneRef.current?.flyTo(first.lat, first.lon, undefined, undefined, first.groundHeight);
   }, [focusToken]);
 
   // Safety: sample the ground under the path after edits settle.
@@ -147,8 +160,19 @@ export function GlobeView() {
     const timer = setTimeout(async () => {
       const p = getPath(mission);
       const samples = p.sampleByDistance(Math.max(5, p.length / 400));
-      const ground = await scene.sampleGround(samples.map((s) => s.position));
-      if (!cancelled) useStore.getState().setSafety(evaluateSafety(mission, p, samples, ground));
+      const positions = samples.map((s) => s.position);
+      const [ground, obstacles] = await Promise.all([
+        scene.sampleGround(positions),
+        obstaclesNear(settings, positions),
+      ]);
+      if (cancelled) return;
+      useStore
+        .getState()
+        .setSafety(evaluateSafety(mission, p, samples, ground, undefined, obstacles.all));
+      const bases = await scene.sampleGround(
+        obstacles.shown.map((o) => ({ lon: o.coords[0]![0], lat: o.coords[0]![1] })),
+      );
+      if (!cancelled) scene.setObstacles(obstacles.shown, bases);
     }, 400);
     return () => {
       cancelled = true;
@@ -157,4 +181,60 @@ export function GlobeView() {
   }, [mission, settings, dem]);
 
   return <div ref={ref} className={`globe mode-${mode}`} />;
+}
+
+/** Obstacles shown on the map: those within this distance of the path (airfields: their radius). */
+const SHOW_MARGIN = 1000;
+let obstacleCache: { key: string; list: Obstacle[] } | undefined;
+let obstacleErrorShown = false;
+
+/**
+ * Mapped obstacles around the path from the downloaded region: all of them for the safety check
+ * (airfields within their warning radius), and the ones close enough to draw.
+ */
+async function obstaclesNear(
+  settings: DataSourceSettings,
+  positions: { lat: number; lon: number }[],
+): Promise<{ all: Obstacle[]; shown: Obstacle[] }> {
+  const none = { all: [], shown: [] };
+  if (!settings.local.obstacles || !hasRequirement(settings, 'local') || !positions.length)
+    return none;
+  const box = (margin: number): [number, number, number, number] => {
+    const lats = positions.map((p) => p.lat);
+    const lons = positions.map((p) => p.lon);
+    const dLat = margin / 111_320;
+    const dLon = dLat / Math.max(0.1, Math.cos((lats[0]! * Math.PI) / 180));
+    return [
+      Math.min(...lons) - dLon,
+      Math.min(...lats) - dLat,
+      Math.max(...lons) + dLon,
+      Math.max(...lats) + dLat,
+    ];
+  };
+  const outer = box(AIRFIELD_RADIUS.aerodrome + 500);
+  // Round the query box so small edits reuse the last answer.
+  const q = outer.map(
+    (v, i) => (i < 2 ? Math.floor(v * 50) : Math.ceil(v * 50)) / 50,
+  ) as typeof outer;
+  const key = `${settings.local.serverUrl}|${settings.local.region}|${q.join(',')}`;
+  let list = obstacleCache?.key === key ? obstacleCache.list : undefined;
+  if (!list) {
+    try {
+      list = await fetchObstacles(settings.local, q);
+      obstacleCache = { key, list };
+      obstacleErrorShown = false;
+    } catch (e) {
+      if (!obstacleErrorShown)
+        useStore.getState().notify(`Offline obstacles unavailable: ${String(e)}`, 'error');
+      obstacleErrorShown = true;
+      return none;
+    }
+  }
+  const [w, s, e, n] = box(SHOW_MARGIN);
+  const near = (o: Obstacle) =>
+    o.coords.some(([lon, lat]) => lon >= w && lon <= e && lat >= s && lat <= n);
+  return {
+    all: list,
+    shown: list.filter((o) => o.kind === 'aerodrome' || o.kind === 'heliport' || near(o)),
+  };
 }

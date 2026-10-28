@@ -8,6 +8,7 @@ import {
   type Event,
 } from 'cesium';
 import type { Dem } from '@odc/core';
+import type { LocalBuildings } from './localBuildings';
 import { applySources, type DataSourceSettings } from './sources';
 import { applyPose, type CameraPose } from './pose';
 
@@ -35,6 +36,7 @@ export class OfflineRenderer {
   private readonly host: HTMLDivElement;
   private readonly widget: CesiumWidget;
   private tilesets: Cesium3DTileset[] = [];
+  private buildings?: LocalBuildings;
   private readonly timeout: number;
 
   private constructor(private readonly opts: OfflineRendererOptions) {
@@ -79,15 +81,16 @@ export class OfflineRenderer {
 
   static async create(opts: OfflineRendererOptions) {
     const r = new OfflineRenderer(opts);
-    const { tilesets } = await applySources(
+    const { tilesets, buildings } = await applySources(
       r.widget.scene,
       r.widget.imageryLayers,
       opts.settings,
-      [],
+      undefined,
       opts.dem,
     );
     for (const t of tilesets) t.maximumScreenSpaceError = 4;
     r.tilesets = tilesets;
+    r.buildings = buildings;
     return r;
   }
 
@@ -96,7 +99,11 @@ export class OfflineRenderer {
   }
 
   private loaded() {
-    return this.widget.scene.globe.tilesLoaded && this.tilesets.every((t) => t.tilesLoaded);
+    return (
+      this.widget.scene.globe.tilesLoaded &&
+      this.tilesets.every((t) => t.tilesLoaded) &&
+      (this.buildings?.idle ?? true)
+    );
   }
 
   /** Render one frame at the pose, waiting for tiles. Returns false if it timed out waiting. */
