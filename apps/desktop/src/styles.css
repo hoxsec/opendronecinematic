@@ -395,20 +395,104 @@ input[type='range'] {
   pointer-events: none;
 }
 
-.pov {
+/* Main area: one pane fills it, the other floats as the mini-screen. */
+.pane {
   position: absolute;
-  right: 12px;
-  bottom: 12px;
-  width: min(44%, 560px);
-  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid var(--border);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
   background: black;
 }
-.pov-frame {
+.pane.is-main {
+  inset: 0;
+}
+.pane.is-mini {
+  z-index: 5;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+.pane.is-mini .cesium-viewer-toolbar,
+.pane.is-mini .cesium-viewer-bottom,
+.pane.is-mini .cesium-widget-credits {
+  display: none !important;
+}
+.mini-chrome {
+  position: absolute;
+  z-index: 6;
+  pointer-events: none;
+}
+.mini-swap {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.mini-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 3px 6px 3px 18px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(15, 23, 42, 0.8);
+  border-radius: 10px 10px 0 0;
+  cursor: move;
+  pointer-events: auto;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.mini-chrome:hover .mini-bar {
+  opacity: 1;
+}
+.mini-bar button {
+  padding: 0 8px;
+}
+.mini-resize {
+  position: absolute;
+  left: -4px;
+  top: -4px;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  pointer-events: auto;
+  border-left: 3px solid var(--accent);
+  border-top: 3px solid var(--accent);
+  border-radius: 8px 0 0 0;
+  opacity: 0;
+}
+.mini-chrome:hover .mini-resize {
+  opacity: 1;
+}
+
+/* Camera view: frames keep the video aspect, letterboxed inside their cell. */
+.camera-pane {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  background: black;
+}
+.camera-pane.compare {
+  grid-template-columns: 1fr 1fr;
+}
+.frame-cell {
+  container-type: size;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+}
+.frame {
   position: relative;
-  width: 100%;
+  width: min(100cqw, 100cqh * var(--ar, 1.7778));
+  max-height: 100cqh;
+  overflow: hidden;
+  touch-action: none;
 }
 .pov-canvas {
   position: absolute;
@@ -417,25 +501,195 @@ input[type='range'] {
 .pov-canvas .cesium-widget-credits {
   display: none !important;
 }
-.pov-hud {
+.hud {
   position: absolute;
   left: 0;
   right: 0;
-  top: 0;
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
   padding: 6px 10px;
   font:
     600 11px ui-monospace,
     Consolas,
     monospace;
   text-shadow: 0 1px 2px black;
-  background: linear-gradient(rgba(0, 0, 0, 0.55), transparent);
   pointer-events: none;
 }
-.pov-hud .rec {
+.hud.top {
+  top: 0;
+  background: linear-gradient(rgba(0, 0, 0, 0.6), transparent);
+}
+.hud .right {
   margin-left: auto;
+}
+.hud .badge {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--accent);
+  color: #04121d;
+  text-shadow: none;
+}
+.hud .badge.fly {
+  background: #f472b6;
+}
+.rec,
+.hud .rec {
   color: var(--danger);
+}
+.warn {
+  color: var(--warn);
+}
+.camera-pane.main .hud {
+  font-size: 13px;
+}
+.camera-pane.mini .hud span:not(.badge):nth-child(n + 5) {
+  display: none;
+}
+.crosshair {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 36px;
+  height: 36px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background:
+    linear-gradient(white, white) center / 2px 12px no-repeat,
+    linear-gradient(white, white) center / 12px 2px no-repeat;
+  border: 2px solid rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  filter: drop-shadow(0 0 2px black);
+}
+.fly-help {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  max-width: 260px;
+  font-size: 11px;
+}
+.fly-help button {
+  padding: 2px 8px;
+  font-size: 11px;
+  background: rgba(15, 23, 42, 0.75);
+}
+.fly-help dl {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.75);
+}
+.fly-help dl div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.fly-help dt {
+  font-family: ui-monospace, Consolas, monospace;
+  color: var(--accent);
+}
+.fly-help dd {
+  margin: 0;
+}
+.rec-overlay {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.65);
+  font:
+    600 12px ui-monospace,
+    Consolas,
+    monospace;
+}
+.rec-overlay .rec {
+  animation: blink 1s steps(2) infinite;
+}
+.rec-overlay .bar {
+  flex-basis: 100%;
+  order: 9;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.15);
+}
+.rec-overlay .bar div {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--danger);
+}
+.rec-overlay button {
+  margin-left: auto;
+}
+@keyframes blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+.take-player {
+  position: absolute;
+  inset: 0;
+  background: black;
+}
+.take-player video,
+.take-player img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.take-player .close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(15, 23, 42, 0.8);
+}
+.takes {
+  position: absolute;
+  top: 40px;
+  right: 10px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-height: calc(100% - 60px);
+}
+.takes > button {
+  background: rgba(15, 23, 42, 0.85);
+}
+.takes ul {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  width: 360px;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.92);
+  border: 1px solid var(--border);
+}
+.takes li {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 6px;
+}
+.takes li > div:first-child {
+  display: flex;
+  flex-direction: column;
+}
+.takes li.selected {
+  background: #0c4a6e;
+}
+.takes .button-row button {
+  padding: 2px 8px;
+  font-size: 12px;
 }
 .pov-thirds {
   position: absolute;

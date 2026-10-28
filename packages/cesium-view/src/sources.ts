@@ -71,7 +71,11 @@ export async function applySources(
       layers.add(ImageryLayer.fromWorldImagery({}));
     } else {
       layers.addImageryProvider(
-        new OpenStreetMapImageryProvider({ url: 'https://tile.openstreetmap.org/' }),
+        new OpenStreetMapImageryProvider({
+          url: 'https://tile.openstreetmap.org/',
+          // OSM serves zoom 0-19; asking for 20 fails and stalls offline renders on tile timeouts.
+          maximumLevel: 19,
+        }),
       );
     }
   } catch (e) {

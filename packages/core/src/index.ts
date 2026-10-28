@@ -5,3 +5,5 @@ export * from './camera';
 export * from './path';
 export * from './safety';
 export * from './templates';
+export * from './flight-sim';
+export * from './track';

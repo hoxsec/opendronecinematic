@@ -1,6 +1,7 @@
 import { createMission, parseMission, serializeMission } from '@odc/core';
 import { useStore, type Mode } from '../store';
 import { openTextFile, saveFile } from '../platform';
+import { useView } from '../viewStore';
 
 const MODES: { value: Mode; label: string; key: string }[] = [
   { value: 'select', label: 'Select', key: 'V' },
@@ -22,6 +23,9 @@ export function Toolbar({
   const canUndo = useStore((s) => s.past.length > 0);
   const canRedo = useStore((s) => s.future.length > 0);
   const { setMode, undo, redo, setMission, notify, focusMission } = useStore.getState();
+  const fly = useView((s) => s.fly);
+  const main = useView((s) => s.main);
+  const rendering = useView((s) => !!s.render);
 
   const newMission = () => {
     const m = useStore.getState().mission;
@@ -85,6 +89,23 @@ export function Toolbar({
             {m.label}
           </button>
         ))}
+      </div>
+      <div className="group">
+        <button
+          className={fly ? 'active' : ''}
+          disabled={rendering}
+          onClick={() => useView.getState().setFly(!fly)}
+          title="Fly the drone to scout and capture waypoints (F, Esc to exit)"
+        >
+          ✈ {fly ? 'Flying' : 'Fly'}
+        </button>
+        <button
+          disabled={fly}
+          onClick={() => useView.getState().swap()}
+          title="Swap main view and mini-screen (Tab)"
+        >
+          {main === 'map' ? '🎥 Camera view' : '🗺 Map view'}
+        </button>
       </div>
       <div className="spacer" />
       <div className="group">

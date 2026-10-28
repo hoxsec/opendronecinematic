@@ -62,7 +62,17 @@ Google Photorealistic 3D Tiles are streamed through Cesium ion. Check the Google
 6. Check the **Safety** panel. Clicking an issue jumps to that point in the flight.
 7. **Export…** to Litchi CSV or DJI KMZ.
 
-Keyboard shortcuts: `V` select · `W` waypoint · `P` POI · `T` takeoff · `Space` play · `Del` delete · `Ctrl+Z` / `Ctrl+Y` undo/redo · `Esc` cancel.
+### Camera view, fly mode and video
+
+- **Swap views:** press **Tab** or click the mini-screen to make the camera view the main screen with the map as the mini-screen, or the other way round. Drag the mini-screen's top bar to move it, and its top-left corner to resize it.
+- **Fly mode (F):** fly the drone from the camera view to scout a shot. The drone keeps the profile's speed and climb limits, accelerates and brakes smoothly, and can't fly into terrain or buildings. It works with keyboard and mouse or a gamepad (Mode 2 sticks).
+  - **Space** (pad A) drops a waypoint at the drone's current position, altitude, heading and gimbal tilt.
+  - **P** (pad B) marks a POI wherever the centre crosshair hits terrain or buildings.
+  - **L** (pad X) starts recording the flight path. Press it again to simplify the path into waypoints that keep your pacing, camera moves and pauses.
+- **🎬 Render…** renders the planned flight frame by frame to **MP4 (H.264), WebM or GIF** at 720p–4K and 24–60 fps. Each frame waits for map tiles, so the output is smooth whatever your hardware. A live REC overlay shows progress, file size and ETA.
+- **Takes:** each render opens in the camera view. Use **🎞 Takes** to replay, save, delete, or **⇆ Compare** a take side by side with the live 3D view, synced to the timeline.
+
+Keyboard shortcuts: `V` select · `W` waypoint · `P` POI · `T` takeoff · `F` fly · `Tab` swap views · `Space` play · `Del` delete · `Ctrl+Z` / `Ctrl+Y` undo/redo · `Esc` cancel.
 
 See [docs/exports.md](docs/exports.md) for how each format maps to the drone and its known limits.
 

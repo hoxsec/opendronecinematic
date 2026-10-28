@@ -53,7 +53,6 @@ interface State {
   mode: Mode;
   time: number;
   playing: boolean;
-  recording: boolean;
   safety?: SafetyReport;
   settings: DataSourceSettings;
   /** Bumped when the user explicitly asks to fly the camera to the mission. */
@@ -68,13 +67,14 @@ interface State {
   setMode(mode: Mode): void;
   setTime(t: number): void;
   setPlaying(p: boolean): void;
-  setRecording(r: boolean): void;
   setSafety(s?: SafetyReport): void;
   setSettings(s: Partial<DataSourceSettings>): void;
   focusMission(): void;
   notify(text: string, kind?: 'info' | 'error'): void;
 
   addWaypointAt(pos: Geodetic): void;
+  /** Append ready-made waypoints (fly-mode captures). */
+  appendWaypoints(wps: Waypoint[]): void;
   updateWaypoint(id: string, patch: Partial<Waypoint>, opts?: { history?: boolean }): void;
   removeWaypoint(id: string): void;
   moveWaypoint(id: string, delta: -1 | 1): void;
@@ -92,7 +92,6 @@ export const useStore = create<State>((set, get) => ({
   mode: 'select',
   time: 0,
   playing: false,
-  recording: false,
   settings: loadSettings(),
   focusToken: 0,
 
@@ -122,7 +121,6 @@ export const useStore = create<State>((set, get) => ({
   setMode: (mode) => set({ mode }),
   setTime: (time) => set({ time }),
   setPlaying: (playing) => set({ playing }),
-  setRecording: (recording) => set({ recording }),
   setSafety: (safety) => set({ safety }),
   setSettings(patch) {
     const settings = { ...get().settings, ...patch };
@@ -165,6 +163,11 @@ export const useStore = create<State>((set, get) => ({
       set({ selectedId: wp.id });
       return { ...mission, waypoints: [...mission.waypoints, wp] };
     });
+  },
+  appendWaypoints(wps) {
+    if (!wps.length) return;
+    get().setMission((m) => ({ ...m, waypoints: [...m.waypoints, ...wps] }));
+    set({ selectedId: wps[wps.length - 1]!.id });
   },
   updateWaypoint(id, patch, opts) {
     get().setMission(

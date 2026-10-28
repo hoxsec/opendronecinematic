@@ -2,13 +2,15 @@ import { useEffect } from 'react';
 import { fmtTime } from '@odc/core';
 import { useStore } from '../store';
 import { usePath } from '../derived';
+import { useView } from '../viewStore';
 
-export function Timeline() {
+export function Timeline({ onRender }: { onRender: () => void }) {
   const time = useStore((s) => s.time);
   const playing = useStore((s) => s.playing);
-  const recording = useStore((s) => s.recording);
   const mission = useStore((s) => s.mission);
-  const { setTime, setPlaying, setRecording, select } = useStore.getState();
+  const rendering = useView((s) => !!s.render);
+  const fly = useView((s) => s.fly);
+  const { setTime, setPlaying, select } = useStore.getState();
   const path = usePath();
   const duration = path.duration;
 
@@ -22,7 +24,6 @@ export function Timeline() {
       if (t >= duration) {
         st.setTime(duration);
         st.setPlaying(false);
-        st.setRecording(false);
         return;
       }
       st.setTime(t);
@@ -41,29 +42,17 @@ export function Timeline() {
     setPlaying(!playing);
   };
 
-  const record = () => {
-    if (recording) {
-      setRecording(false);
-      setPlaying(false);
-      return;
-    }
-    setTime(0);
-    setRecording(true);
-    setPlaying(true);
-  };
-
   return (
     <div className="timeline">
-      <button onClick={togglePlay} disabled={duration === 0} title="Play / pause (Space)">
+      <button onClick={togglePlay} disabled={duration === 0 || fly} title="Play / pause (Space)">
         {playing ? '❚❚' : '▶'}
       </button>
       <button
-        onClick={record}
-        disabled={duration === 0}
-        className={recording ? 'danger' : ''}
-        title="Record the drone view to WebM"
+        onClick={onRender}
+        disabled={duration === 0 || rendering || fly}
+        title="Render the drone camera to MP4 / WebM / GIF"
       >
-        {recording ? '■ Stop' : '● Rec'}
+        🎬 Render…
       </button>
       <span className="mono">
         {fmtTime(time)} / {fmtTime(duration)}
@@ -75,6 +64,7 @@ export function Timeline() {
           max={duration || 1}
           step={0.01}
           value={time}
+          disabled={fly}
           onChange={(e) => {
             setPlaying(false);
             setTime(Number(e.target.value));

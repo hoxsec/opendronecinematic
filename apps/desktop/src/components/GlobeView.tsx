@@ -3,6 +3,7 @@ import { evaluateSafety, waypointHeight, altFromHeight } from '@odc/core';
 import { MissionScene, effectiveSources, type PickTarget } from '@odc/cesium-view';
 import { useStore } from '../store';
 import { getPath, useCamera, usePath } from '../derived';
+import { useView } from '../viewStore';
 
 /** Exposed so other panels (shot templates) can sample ground heights. */
 export let activeScene: MissionScene | undefined;
@@ -17,6 +18,7 @@ export function GlobeView() {
   const safety = useStore((s) => s.safety);
   const focusToken = useStore((s) => s.focusToken);
   const mode = useStore((s) => s.mode);
+  const fly = useView((s) => s.fly);
   const path = usePath();
   const { fov, profile } = useCamera();
 
@@ -119,8 +121,10 @@ export function GlobeView() {
   }, [mission, path, selectedId, safety]);
 
   useEffect(() => {
+    // In fly mode the fly controller drives the drone marker instead of the timeline.
+    if (fly) return;
     sceneRef.current?.setDrone(path.sample(time), fov.horizontal, profile.videoAspect);
-  }, [path, time, fov.horizontal, profile.videoAspect]);
+  }, [fly, path, time, fov.horizontal, profile.videoAspect]);
 
   useEffect(() => {
     if (focusToken === 0) return;

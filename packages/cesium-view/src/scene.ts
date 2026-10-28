@@ -12,7 +12,8 @@ import {
   DebugCameraPrimitive,
   EllipsoidTerrainProvider,
   Entity,
-  HeadingPitchRoll,
+  HeadingPitchRange,
+  Matrix4,
   HorizontalOrigin,
   LabelStyle,
   Math as CMath,
@@ -31,10 +32,10 @@ import {
   type FlightPath,
   type Geodetic,
   type Mission,
-  type PathSample,
   type SafetyIssue,
 } from '@odc/core';
 import { applySources, type DataSourceSettings } from './sources';
+import { applyPose, type CameraPose } from './pose';
 
 export type PickTarget = { kind: 'waypoint' | 'poi'; id: string } | { kind: 'takeoff' };
 
@@ -310,14 +311,14 @@ export class MissionScene {
     this.viewer.scene.requestRender();
   }
 
-  /** Show the drone and its camera frustum at a point on the path. */
-  setDrone(sample: PathSample | undefined, horizontalFovDeg: number, aspect: number) {
-    if (!sample) {
+  /** Show the drone and its camera frustum at a pose (path sample or live fly-mode state). */
+  setDrone(pose: CameraPose | undefined, horizontalFovDeg: number, aspect: number) {
+    if (!pose) {
       if (this.droneEntity) this.droneEntity.show = false;
       if (this.frustum) this.frustum.show = false;
       return;
     }
-    const position = cart(sample.position);
+    const position = cart(pose.position);
     if (!this.droneEntity) {
       this.droneEntity = this.droneLayer.entities.add({
         position: new ConstantPositionProperty(position),
@@ -336,14 +337,7 @@ export class MissionScene {
     const cam = this.frustumCamera;
     (cam.frustum as PerspectiveFrustum).fov = CMath.toRadians(horizontalFovDeg);
     (cam.frustum as PerspectiveFrustum).aspectRatio = aspect;
-    cam.setView({
-      destination: position,
-      orientation: new HeadingPitchRoll(
-        CMath.toRadians(sample.yaw),
-        CMath.toRadians(sample.pitch),
-        0,
-      ),
-    });
+    applyPose(cam, pose);
     if (!this.frustum) {
       this.frustum = this.viewer.scene.primitives.add(
         new DebugCameraPrimitive({
@@ -355,6 +349,18 @@ export class MissionScene {
       );
     }
     this.frustum!.show = true;
+  }
+
+  /** Chase view for the mini-map in fly mode: high above and behind the drone, looking down. */
+  followDrone(pose: CameraPose, range = 350) {
+    const { camera } = this.viewer;
+    const target = cart(pose.position);
+    camera.lookAt(
+      target,
+      new HeadingPitchRange(CMath.toRadians(pose.yaw), CMath.toRadians(-55), range),
+    );
+    // lookAt locks the camera to the target; release it so normal navigation works afterwards.
+    camera.lookAtTransform(Matrix4.IDENTITY);
   }
 
   /**
