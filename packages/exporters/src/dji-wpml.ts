@@ -40,7 +40,9 @@ function missionConfig(mission: Mission, warnings: string[]) {
     );
     e = { ...FALLBACK_ENUM, verified: false };
   } else if (!e.verified) {
-    warnings.push(`DJI WPML enum values for ${profile.name} are community-sourced and unverified.`);
+    warnings.push(
+      `DJI WPML enum values for ${profile.name} are not confirmed by DJI documentation yet; check the file in DJI Pilot 2 first.`,
+    );
   }
   const finish = { hover: 'noAction', returnHome: 'goHome', land: 'autoLand' }[
     mission.settings.finishAction

@@ -232,18 +232,19 @@ Every render becomes a **take** that plays right inside the camera view. Open **
 
 ### Drone profiles
 
-| Profile                    | Lens (35 mm eq.) | Max speed | Flight time | Exports                      |
-| -------------------------- | ---------------- | --------- | ----------- | ---------------------------- |
-| DJI Mini 4 Pro             | 24 mm            | 16 m/s    | 34 min      | Litchi, DJI KMZ¹             |
-| DJI Air 3 (wide)           | 24 mm            | 21 m/s    | 46 min      | Litchi, DJI KMZ¹             |
-| DJI Mavic 3 (Hasselblad)   | 24 mm            | 21 m/s    | 46 min      | Litchi, DJI KMZ¹             |
-| DJI Mavic 3 Enterprise     | 24 mm            | 15 m/s    | 45 min      | DJI KMZ                      |
-| DJI Matrice 30 (wide)      | 24 mm            | 23 m/s    | 41 min      | DJI KMZ                      |
-| DJI Matrice 350 RTK + H20  | 24 mm            | 23 m/s    | 55 min      | DJI KMZ                      |
-| ArduPilot / PX4 multirotor | 24 mm            | 12 m/s    | 20 min      | QGC `.plan`, Mission Planner |
-| Custom                     | yours            | yours     | yours       | all                          |
+47 profiles, grouped by app in the **Drone** picker. Each sets the camera (field of view and ground sample distance), speed and climb limits, flight time and gimbal range.
 
-¹ DJI Fly has no KMZ import. Enum values for consumer drones are community-sourced; please help verify them.
+| Group                        | Models                                                                                                                                            | Exports                      |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| DJI consumer (DJI Fly)       | Mini 2 / SE, Mini 3, Mini 3 Pro, Mini 4 Pro, Mini 5 Pro, Air 2, Air 2S, Air 3, Air 3S, Mavic 3 / Classic / Cine, Mavic 3 Pro, Mavic 4 Pro         | Litchi¹, DJI KMZ²            |
+| DJI consumer, previz only    | Mini 4K / Mini 2 SE, Lito 1, Lito X1, Flip, Neo, Avata 2                                                                                          | none (no waypoint API)       |
+| DJI enterprise (DJI Pilot 2) | Mavic 3E / 3T / 3M, Matrice 3D / 3TD, Matrice 4E / 4T / 4D / 4TD, Matrice 30 / 30T, Matrice 300 RTK (H20, P1), Matrice 350 RTK (H20, H30, P1, L2) | DJI KMZ³                     |
+| DJI enterprise, other apps   | Inspire 3, Phantom 4 RTK                                                                                                                          | none                         |
+| DJI older (DJI GO 4)         | Mavic 2 Pro, Mavic 2 Zoom, Mavic Pro, Mavic Air, Spark, Phantom 4 / Advanced, Phantom 4 Pro / V2.0, Inspire 2 + X5S                               | Litchi                       |
+| Open autopilots              | ArduPilot / PX4 multirotor                                                                                                                        | QGC `.plan`, Mission Planner |
+| Custom                       | your own lens, speed and battery                                                                                                                  | all                          |
+
+¹ Only for drones Litchi supports. ² DJI Fly has no KMZ import: replace a mission it created (see [docs/exports.md](docs/exports.md)). The Mini 4 Pro enum value is community-sourced; other DJI Fly drones fall back to a generic one, with a warning. ³ Enum values for the M300, M350, M30, Mavic 3 enterprise and Matrice 3D series match DJI's Cloud API. Matrice 4, H30 and L2 values are not yet confirmed and the export says so. Specs for the Lito 1 and Lito X1 come from early reviews. Please help verify.
 
 ### Map data
 
