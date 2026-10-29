@@ -51,7 +51,15 @@ export function CameraView({ isMain }: { isMain: boolean }) {
   }, []);
 
   useEffect(() => {
-    povRef.current?.setSources(settings, dem);
+    let cancelled = false;
+    povRef.current?.setSources(settings, dem).then((errors) => {
+      if (cancelled) return;
+      const shown = dem ? errors : errors.filter((e) => !e.includes('GeoTIFF'));
+      if (shown.length) useStore.getState().notify(`Drone view: ${shown.join(' · ')}`, 'error');
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [settings, dem]);
 
   useEffect(() => {

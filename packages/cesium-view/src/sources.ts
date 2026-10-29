@@ -476,17 +476,20 @@ export async function applySources(
   }
 
   const tilesets: Cesium3DTileset[] = [];
+  let googleLoaded = false;
   const add = async (label: string, make: () => Promise<Cesium3DTileset>) => {
     try {
       const t = await make();
       scene.primitives.add(t);
       tilesets.push(t);
+      return true;
     } catch (e) {
       errors.push(`${label}: ${message(e)}`);
+      return false;
     }
   };
   if (s.buildings === 'osm') await add('OSM Buildings', () => createOsmBuildingsAsync());
-  if (s.buildings === 'google') await add('Google 3D Tiles', createGoogleTileset);
+  if (s.buildings === 'google') googleLoaded = await add('Google 3D Tiles', createGoogleTileset);
   for (const url of s.customTilesets)
     await add(`Tileset ${url}`, () => Cesium3DTileset.fromUrl(url));
 
@@ -502,7 +505,8 @@ export async function applySources(
   }
 
   // Photorealistic tiles already contain terrain; hiding the globe avoids z-fighting.
-  const showGlobe = s.buildings !== 'google';
+  // A failed Google request must leave the imagery/terrain fallback visible.
+  const showGlobe = !googleLoaded;
   scene.globe.show = showGlobe;
   return { tilesets, buildings, errors, showGlobe };
 }
@@ -521,6 +525,8 @@ async function createGoogleTileset(): Promise<Cesium3DTileset> {
     cacheBytes: 1536 * 1024 * 1024,
     maximumCacheOverflowBytes: 1024 * 1024 * 1024,
     enableCollision: true,
+    // The drone camera keeps moving; do not starve its tile requests while flying.
+    cullRequestsWhileMoving: false,
   });
 }
 
