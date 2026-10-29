@@ -9,3 +9,4 @@ export * from './vectorTiles';
 export * from './localBuildings';
 export * from './lighting';
 export * from './gizmo';
+export { tileCache, TILE_CACHE_LIMIT } from './tileCache';

@@ -7,6 +7,8 @@ import {
   effectiveSources,
   hasRequirement,
   readGeoTiffDem,
+  tileCache,
+  TILE_CACHE_LIMIT,
   type ApiKeys,
   type CustomImagery,
   type DataSourceSettings,
@@ -31,7 +33,7 @@ import {
 } from '../localData';
 import { Field, NumberInput, Select } from './fields';
 
-type Tab = 'sources' | 'offline' | 'keys';
+type Tab = 'sources' | 'offline' | 'keys' | 'cache';
 
 const NEEDS: Record<Requirement, string> = {
   ion: 'a Cesium ion token',
@@ -83,6 +85,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               ['sources', 'Sources'],
               ['offline', 'Offline countries'],
               ['keys', 'Tokens & keys'],
+              ['cache', 'Tile cache'],
             ] as const
           ).map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
@@ -94,6 +97,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         {tab === 'sources' && <SourcesTab draft={draft} up={up} grid={grid} setGrid={setGrid} />}
         {tab === 'offline' && <OfflineTab draft={draft} up={up} />}
         {tab === 'keys' && <KeysTab draft={draft} up={up} />}
+        {tab === 'cache' && <TileCacheTab />}
 
         <div className="button-row end">
           <button onClick={onClose}>Cancel</button>
@@ -382,6 +386,71 @@ function SourcesTab({
           </button>
         )}
       </div>
+    </>
+  );
+}
+
+function TileCacheTab() {
+  const [stats, setStats] = useState<{ bytes: number; tiles: number }>();
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    let active = true;
+    const refresh = () =>
+      tileCache.stats().then(
+        (value) => {
+          if (active) setStats(value);
+        },
+        () => {
+          if (active)
+            setError('Persistent tile storage is unavailable. Normal map loading still works.');
+        },
+      );
+    void refresh();
+    const timer = window.setInterval(() => void refresh(), 3000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, []);
+  return (
+    <>
+      <h3>Google / ion 3D tile cache</h3>
+      <p className="muted small">
+        Automatically keeps the original-quality binary tiles you visit, including fine detail,
+        across app restarts. Each detail level is stored separately: a coarse tile never replaces a
+        detailed one. This does not download maximum detail for unvisited areas.
+      </p>
+      <p>
+        {stats
+          ? `${formatBytes(stats.bytes)} · ${stats.tiles.toLocaleString()} tiles`
+          : 'Reading cache…'}
+        {` / ${TILE_CACHE_LIMIT / 1_000_000_000} GB limit`}
+      </p>
+      <p className="muted small">
+        Least recently used tiles are removed automatically. Storage may be lower if your browser or
+        webview imposes a smaller quota or clears app data. Only explicitly cacheable responses with
+        readable freshness headers are saved. Expired tiles return to the normal network/browser
+        revalidation path; this is not an offline Google Maps download.
+      </p>
+      {error && <p className="muted small">{error}</p>}
+      <button
+        disabled={busy || !stats?.tiles}
+        onClick={async () => {
+          setBusy(true);
+          try {
+            await tileCache.clear();
+            setStats(await tileCache.stats());
+            setError('');
+          } catch {
+            setError('Could not clear the tile cache.');
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        Clear tile cache
+      </button>
     </>
   );
 }

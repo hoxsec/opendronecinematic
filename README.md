@@ -284,6 +284,14 @@ To work offline or with better local data, pick **Terrain → GeoTIFF DEM (local
 
 Under **Your own 3D Tiles** you can add photogrammetry or scans exported as 3D Tiles. In the browser, give a URL. In the desktop app, you can also browse to a local folder.
 
+#### Persistent 3D tile cache
+
+Google Photorealistic and Cesium ion binary tile payloads are automatically cached in the app's private IndexedDB storage, up to **10 GB** of payload data (or less if the browser/webview quota is smaller). **Map data → Tile cache** shows usage and lets you clear it. Least recently used tiles are evicted first; clearing this cache does not remove missions, downloaded countries or GeoTIFF DEMs.
+
+Tiles are saved byte-for-byte at the detail level actually requested. Fine and coarse tiles have separate keys, so a coarse tile cannot replace a fine one. This does not force or prefetch maximum detail: Cesium still chooses the appropriate level for the current view. Sessions, tokens and request headers remain part of the cache identity; changing them may require fresh downloads.
+
+Only successful full binary responses with explicit, readable HTTP freshness information are saved. `no-store`, `no-cache`, `Vary: *`, expiry and response age are respected; stale tiles go through Cesium's normal XHR/browser HTTP-cache path, including normal browser revalidation where available. If freshness headers are hidden by CORS, caching is skipped. This is not an unrestricted offline Google Maps archive, and an ion token does not override the provider's terms. Manifest JSON, image-element requests and other providers continue using normal browser caching. Storage failures fall back to normal loading, and clearing app/browser data removes the cache.
+
 ---
 
 ## 🚀 Getting started

@@ -25,6 +25,7 @@ import { createDemTerrainProvider } from './dem';
 import { LocalBuildings } from './localBuildings';
 import { createRgbTerrainProvider } from './terrain';
 import { VectorTileImageryProvider, VectorTileSource, fetchTileJson } from './vectorTiles';
+import { installTileCache } from './tileCacheAdapter';
 
 export type ImagerySource =
   | 'ion'
@@ -446,6 +447,7 @@ export async function applySources(
   previous?: AppliedSources,
   dem?: Dem,
 ): Promise<AppliedSources> {
+  installTileCache();
   const s = effectiveSources(settings);
   const errors: string[] = [];
   if (s.ionToken) Ion.defaultAccessToken = s.ionToken.trim();
