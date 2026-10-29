@@ -18,9 +18,10 @@ import { useStore } from '../store';
 import { getPath, useCamera, usePath, useSunTime } from '../derived';
 import { useView } from '../viewStore';
 import { runAnalysis } from '../analysisWorker';
+import { setActiveScene } from '../sceneAccess';
 
 /** Exposed so other panels (shot templates) can sample ground heights. */
-export let activeScene: MissionScene | undefined;
+export { activeScene } from '../sceneAccess';
 
 export function GlobeView() {
   const ref = useRef<HTMLDivElement>(null);
@@ -44,13 +45,13 @@ export function GlobeView() {
   useEffect(() => {
     const scene = new MissionScene(ref.current!, effectiveSources(settings).ionToken.length > 0);
     sceneRef.current = scene;
-    activeScene = scene;
+    setActiveScene(scene);
     if (import.meta.env.DEV) Object.assign(window, { odcScene: scene });
     const m = useStore.getState().mission;
     const first = m.waypoints[0] ?? m.takeoff;
     scene.flyTo(first.lat, first.lon, 1500, 0, first.groundHeight);
     return () => {
-      activeScene = undefined;
+      setActiveScene(undefined);
       scene.destroy();
     };
     // The viewer is created once; settings changes are applied below.
@@ -70,8 +71,12 @@ export function GlobeView() {
       const { mission: m, setMission } = useStore.getState();
       if (m.waypoints.length === 0) {
         const [h] = await scene.sampleGround([m.takeoff]);
-        if (h !== undefined && !cancelled)
-          setMission({ ...m, takeoff: { ...m.takeoff, groundHeight: h } }, { history: false });
+        if (h !== undefined && h !== m.takeoff.groundHeight && !cancelled)
+          setMission(
+            (current) =>
+              current === m ? { ...m, takeoff: { ...m.takeoff, groundHeight: h } } : current,
+            { history: false },
+          );
       }
     });
     return () => {

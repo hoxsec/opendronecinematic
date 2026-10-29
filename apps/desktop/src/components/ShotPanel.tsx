@@ -55,12 +55,25 @@ export function ShotPanel() {
         ...w,
         groundHeight: grounds[i] ?? w.groundHeight,
       }));
+      if (useStore.getState().mission !== st.mission) {
+        st.notify(
+          'The project changed while generating the shot. Try again with the current plan.',
+        );
+        return;
+      }
       st.setMission((m) => ({
         ...m,
         waypoints: append ? [...m.waypoints, ...waypoints] : waypoints,
       }));
       st.setTime(0);
       st.notify(`${info.name}: ${waypoints.length} waypoints around ${subject.name}.`);
+    } catch (error) {
+      useStore
+        .getState()
+        .notify(
+          `Could not generate the shot: ${error instanceof Error ? error.message : String(error)}`,
+          'error',
+        );
     } finally {
       setBusy(false);
     }

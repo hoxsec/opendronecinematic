@@ -55,6 +55,8 @@ export class FlyInputSource {
   gamepadName?: string;
 
   private onKeyDown = (e: KeyboardEvent) => {
+    // Application file shortcuts (Ctrl+S/O/N) must not become flight-control input.
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
     if ((e.target as HTMLElement).closest?.('input, select, textarea')) return;
     const action = KEY_ACTIONS[e.code];
     if (action && !e.repeat) this.actions.push(action);

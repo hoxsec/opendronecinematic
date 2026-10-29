@@ -43,6 +43,12 @@ export function SurveyPanel() {
       }
       const grounds = (await activeScene?.sampleGround(plan.points)) ?? [];
       const waypoints = surveyWaypoints(m, spec, plan, grounds);
+      if (useStore.getState().mission !== st.mission) {
+        st.notify(
+          'The project changed while generating the survey. Try again with the current plan.',
+        );
+        return;
+      }
       st.setMission({
         ...m,
         waypoints,
@@ -53,6 +59,13 @@ export function SurveyPanel() {
       st.notify(
         `Survey: ${plan.lines} lines, ${waypoints.length} waypoints, ~${plan.photos} photos.`,
       );
+    } catch (error) {
+      useStore
+        .getState()
+        .notify(
+          `Could not generate the survey: ${error instanceof Error ? error.message : String(error)}`,
+          'error',
+        );
     } finally {
       setBusy(false);
     }

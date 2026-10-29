@@ -33,7 +33,6 @@ export interface SelectionModifiers {
 export const PLAYBACK_RATES = [0.5, 1, 1.5, 2, 2.5, 3] as const;
 
 const SETTINGS_KEY = 'odc.settings.v1';
-const AUTOSAVE_KEY = 'odc.autosave.v1';
 const HISTORY_LIMIT = 100;
 
 /** Start somewhere scenic until the user picks a location (Lauterbrunnen valley). */
@@ -47,16 +46,6 @@ function loadSettings(): DataSourceSettings {
     /* ignore corrupt settings */
   }
   return withDefaults(DEFAULT_DATA_SOURCES);
-}
-
-function loadAutosave(): Mission {
-  try {
-    const raw = localStorage.getItem(AUTOSAVE_KEY);
-    if (raw) return JSON.parse(raw) as Mission;
-  } catch {
-    /* fall through */
-  }
-  return createMission(DEFAULT_TAKEOFF);
 }
 
 interface State {
@@ -81,6 +70,8 @@ interface State {
 
   /** Replace the mission. Pass history: false for continuous edits (drags) after the first step. */
   setMission(next: Mission | ((m: Mission) => Mission), opts?: { history?: boolean }): void;
+  /** A different project starts a fresh editor session, not an undo step. */
+  loadMission(mission: Mission): void;
   undo(): void;
   redo(): void;
   select(id?: string, modifiers?: SelectionModifiers): void;
@@ -139,7 +130,7 @@ function selectionAfterEdit(
 }
 
 export const useStore = create<State>((set, get) => ({
-  mission: loadAutosave(),
+  mission: createMission(DEFAULT_TAKEOFF),
   past: [],
   future: [],
   selectedWaypointIds: [],
@@ -160,6 +151,22 @@ export const useStore = create<State>((set, get) => ({
       past: opts.history === false ? s.past : [...s.past.slice(-HISTORY_LIMIT + 1), prev],
       future: opts.history === false ? s.future : [],
       ...selectionAfterEdit(s, mission),
+    }));
+  },
+  loadMission(mission) {
+    set((s) => ({
+      mission,
+      past: [],
+      future: [],
+      selectedId: undefined,
+      selectedWaypointIds: [],
+      selectionAnchor: undefined,
+      mode: 'select',
+      time: 0,
+      playing: false,
+      safety: undefined,
+      safetyPending: false,
+      focusToken: s.focusToken + 1,
     }));
   },
   undo() {
@@ -375,19 +382,5 @@ if (useStore.getState().settings.terrain === 'geotiff') {
     })
     .catch((e) => useStore.getState().notify(`GeoTIFF terrain: ${e.message ?? e}`, 'error'));
 }
-
-// Autosave so a crash or reload never loses a plan.
-let saveTimer: ReturnType<typeof setTimeout> | undefined;
-useStore.subscribe((s, prev) => {
-  if (s.mission === prev.mission) return;
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(s.mission));
-    } catch {
-      /* ignore */
-    }
-  }, 500);
-});
 
 const round1 = (v: number) => Math.round(v * 10) / 10;

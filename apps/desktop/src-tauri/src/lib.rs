@@ -2,6 +2,8 @@ use odc_localdata::{DownloadRequest, GeofabrikRegion, LocalData, RegionMeta};
 use std::sync::Arc;
 use tauri::{Emitter, Manager, State};
 
+mod project_files;
+
 type Local<'a> = State<'a, Arc<LocalData>>;
 
 /// Run blocking local-data work off the main thread and turn errors into strings for the UI.
@@ -64,12 +66,14 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_fs::init())
         .setup(|app| {
+            project_files::setup(app.handle())?;
             // Offline country data lives in the app data dir and is served on 127.0.0.1.
             let root = app.path().app_data_dir()?.join("localdata");
             app.manage(Arc::new(LocalData::start(root)?));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            project_files::remember_project_path,
             local_server_url,
             geofabrik_regions,
             region_pbf_size,

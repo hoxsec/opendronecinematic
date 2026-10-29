@@ -4,25 +4,24 @@ import { useView } from './viewStore';
 import { Toolbar } from './components/Toolbar';
 import { Workspace } from './components/Workspace';
 import { Timeline } from './components/Timeline';
-import { MissionPanel } from './components/MissionPanel';
-import { SunPanel } from './components/SunPanel';
-import { WaypointPanel } from './components/WaypointPanel';
-import { PoiPanel } from './components/PoiPanel';
-import { ShotPanel } from './components/ShotPanel';
-import { SurveyPanel } from './components/SurveyPanel';
-import { SafetyPanel } from './components/SafetyPanel';
+import { PlannerSidebar } from './components/PlannerSidebar';
+import { ProjectHome } from './components/ProjectHome';
+import { UnsavedDialog } from './components/UnsavedDialog';
 import { ExportDialog } from './components/ExportDialog';
 import { SettingsDialog } from './components/SettingsDialog';
 import { RenderDialog } from './components/RenderDialog';
 import { resetLocalTiles } from '@odc/cesium-view';
 import { canDownload, localServerUrl, useLocalData, watchDownloads } from './localData';
+import { useProject } from './projectStore';
+import { useProjectLifecycle } from './useProjectLifecycle';
 
 export function App() {
   const [dialog, setDialog] = useState<'export' | 'settings' | 'render' | undefined>();
   const toast = useStore((s) => s.toast);
-  const needsBuildings = useStore(
-    (s) => !s.settings.ionToken.trim() && s.settings.buildings !== 'local',
-  );
+  const screen = useProject((s) => s.screen);
+  const pendingAction = useProject((s) => s.pendingAction);
+  const busy = useProject((s) => s.busy);
+  useProjectLifecycle();
 
   useEffect(() => {
     // The desktop tile server falls back to another port if the usual one is taken.
@@ -51,17 +50,31 @@ export function App() {
   useEffect(() => {
     // Fly mode captures its own keys (capture phase) before this handler sees them.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setDialog(undefined);
+      const project = useProject.getState();
+      const mod = e.ctrlKey || e.metaKey;
+      const key = e.key.toLowerCase();
+      if (mod && ['s', 'o', 'n'].includes(key)) {
+        e.preventDefault();
+        if (dialog || project.pendingAction || project.busy || useView.getState().render) return;
+        if (key === 's') void project.save(e.shiftKey);
+        else void project.request({ kind: key === 'o' ? 'open' : 'new' });
+        return;
+      }
+      if (e.key === 'Escape' && dialog) {
+        setDialog(undefined);
+        return;
+      }
+      if (dialog || project.pendingAction || project.busy || project.screen !== 'editor') return;
       const el = e.target as HTMLElement;
       if (el.closest('input, select, textarea, [role="slider"], [contenteditable="true"]')) return;
       const st = useStore.getState();
       const view = useView.getState();
-      const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === 'z')
         (e.shiftKey ? st.redo() : st.undo(), e.preventDefault());
       else if (mod && e.key.toLowerCase() === 'y') (st.redo(), e.preventDefault());
       else if (e.key === 'Escape') st.setMode('select');
-      else if (e.key === 'Tab') (e.preventDefault(), !view.fly && view.swap());
+      else if (e.key === 'Tab' && !e.shiftKey && el.tagName === 'CANVAS')
+        (e.preventDefault(), !view.fly && view.swap());
       else if (e.key === ' ' && !el.closest('button'))
         (st.setPlaying(!st.playing), e.preventDefault());
       else if (e.key === 'Delete' || e.key === 'Backspace') {
@@ -88,31 +101,40 @@ export function App() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [dialog]);
 
   return (
-    <div className="app">
-      <Toolbar onExport={() => setDialog('export')} onSettings={() => setDialog('settings')} />
-      <aside className="sidebar">
-        {needsBuildings && (
-          <div className="banner" onClick={() => setDialog('settings')}>
-            Add a free Cesium ion token or download a country for 3D buildings →
+    <div className="app-shell">
+      <div className="app-content" inert={!!dialog || !!pendingAction || busy === 'opening'}>
+        {screen === 'home' ? (
+          <ProjectHome onSettings={() => setDialog('settings')} />
+        ) : (
+          <div className="app">
+            <Toolbar
+              onExport={() => setDialog('export')}
+              onSettings={() => setDialog('settings')}
+            />
+            <PlannerSidebar onSettings={() => setDialog('settings')} />
+            <Workspace />
+            <Timeline onRender={() => setDialog('render')} />
           </div>
         )}
-        <MissionPanel />
-        <SunPanel />
-        <WaypointPanel />
-        <PoiPanel />
-        <ShotPanel />
-        <SurveyPanel />
-        <SafetyPanel />
-      </aside>
-      <Workspace />
-      <Timeline onRender={() => setDialog('render')} />
-      {toast && <div className={`toast ${toast.kind}`}>{toast.text}</div>}
+      </div>
+      {toast && (
+        <div className={`toast ${toast.kind}`} role={toast.kind === 'error' ? 'alert' : 'status'}>
+          {toast.text}
+        </div>
+      )}
       {dialog === 'export' && <ExportDialog onClose={() => setDialog(undefined)} />}
       {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(undefined)} />}
       {dialog === 'render' && <RenderDialog onClose={() => setDialog(undefined)} />}
+      {pendingAction && <UnsavedDialog />}
+      {busy === 'opening' && (
+        <div className="project-busy" role="status">
+          <span className="loading-spinner" />
+          Opening project…
+        </div>
+      )}
     </div>
   );
 }

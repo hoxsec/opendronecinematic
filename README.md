@@ -23,6 +23,7 @@
 <p align="center">
   <a href="#-features">Features</a> ·
   <a href="#-tour">Tour</a> ·
+  <a href="#project-home-and-saving-your-work">Projects & recovery</a> ·
   <a href="#-getting-started">Getting started</a> ·
   <a href="#%EF%B8%8F-keyboard-shortcuts">Shortcuts</a> ·
   <a href="docs/exports.md">Export formats</a> ·
@@ -31,7 +32,7 @@
 </p>
 
 <p align="center">
-  <img src="docs/images/overview.webp" alt="A helix shot around the Eiffel Tower: waypoints, points of interest, the drone and its camera frustum on the 3D map, with the live drone camera in the mini-screen" width="100%">
+  <img src="docs/images/overview.webp" alt="The updated planner: a helix study around the Eiffel Tower, Plan/Create/Light/Safety tabs, project save status, the 3D flight path, and a live drone-camera mini-screen" width="100%">
 </p>
 
 > [!WARNING]
@@ -41,25 +42,53 @@
 
 ## ✨ Features
 
-| Feature                        | What it does                                                                                                                |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------- |
-| 🌍 **Plan on a real 3D globe** | Cesium World Terrain, aerial imagery, OSM Buildings, Google Photorealistic 3D Tiles, or your own photogrammetry.            |
-| 🎯 **Aim the camera exactly**  | Points of interest, heading and gimbal modes per waypoint, smooth easing between them.                                      |
-| 🎥 **See what the drone sees** | A live camera view using the drone's real field of view. Swap it with the map at any time.                                  |
-| ☀️ **Sun and golden hour**     | Real sun lighting and shadows for the shoot date and time, golden and blue hour on a day strip, and the light on your shot. |
-| 🔭 **Zoom and dolly zoom**     | Per-waypoint focal length with real lens data, lens-switch and digital-zoom marks, a vertigo template and framing guides.   |
-| 🕹️ **Fly mode**                | Fly a simulated drone with keyboard, mouse or gamepad. Drop waypoints, mark POIs, or record a flight path.                  |
-| 🎬 **Shot templates**          | Orbit, helix, reveal, dolly, fly-by and dronie, generated around a subject in one click.                                    |
-| 🗺️ **Survey grids**            | Draw an area, set height and overlap, get a lawnmower grid with GSD, photo count and distance-triggered photos.             |
-| 🛡️ **Safety checks**           | Terrain and building clearance, 120 m ceiling, range, speed, climb rate and battery.                                        |
-| 📤 **Export to your drone**    | Litchi CSV, DJI WPML/KMZ, QGroundControl `.plan` and Mission Planner, with an option to match the preview.                  |
-| 📥 **Import missions**         | Open Litchi CSV, DJI KMZ, QGC `.plan` and Mission Planner files to preview, edit and re-export them.                        |
-| ⛰️ **GeoTIFF terrain**         | Load your own elevation model (SRTM, Copernicus, lidar) for offline terrain, safety checks and terrain following.           |
-| 🎞️ **Render previz video**     | Frame-exact MP4, WebM or GIF at up to 4K. Compare takes side by side with the live view.                                    |
+| Feature                        | What it does                                                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 🗂️ **Projects and recovery**   | A project home with recent files, portable `.odc.json` projects, Save / Save as, local recovery drafts and unsaved-change protection. |
+| 🌍 **Plan on a real 3D globe** | Cesium World Terrain, aerial imagery, OSM Buildings, Google Photorealistic 3D Tiles, or your own photogrammetry.                      |
+| 🎯 **Aim the camera exactly**  | Points of interest, heading and gimbal modes per waypoint, smooth easing between them.                                                |
+| 🎥 **See what the drone sees** | A live camera view using the drone's real field of view. Swap it with the map at any time.                                            |
+| ☀️ **Sun and golden hour**     | Real sun lighting and shadows for the shoot date and time, golden and blue hour on a day strip, and the light on your shot.           |
+| 🔭 **Zoom and dolly zoom**     | Per-waypoint focal length with real lens data, lens-switch and digital-zoom marks, a vertigo template and framing guides.             |
+| 🕹️ **Fly mode**                | Fly a simulated drone with keyboard, mouse or gamepad. Drop waypoints, mark POIs, or record a flight path.                            |
+| 🎬 **Shot templates**          | Orbit, helix, reveal, dolly, fly-by and dronie, generated around a subject in one click.                                              |
+| 🗺️ **Survey grids**            | Draw an area, set height and overlap, get a lawnmower grid with GSD, photo count and distance-triggered photos.                       |
+| 🛡️ **Safety checks**           | Terrain and building clearance, 120 m ceiling, range, speed, climb rate and battery.                                                  |
+| 📤 **Export to your drone**    | Litchi CSV, DJI WPML/KMZ, QGroundControl `.plan` and Mission Planner, with an option to match the preview.                            |
+| 📥 **Import missions**         | Open Litchi CSV, DJI KMZ, QGC `.plan` and Mission Planner files to preview, edit and re-export them.                                  |
+| ⛰️ **GeoTIFF terrain**         | Load your own elevation model (SRTM, Copernicus, lidar) for offline terrain, safety checks and terrain following.                     |
+| 🎞️ **Render previz video**     | Frame-exact MP4, WebM or GIF at up to 4K. Compare takes side by side with the live view.                                              |
 
 ---
 
 ## 🧭 Tour
+
+The screenshots below are captured from the current browser app with demonstration projects. Map views use OpenStreetMap on flat terrain, without an API token; these examples are **not flight-ready missions**.
+
+### Project home and saving your work
+
+The app opens on **Projects**, with **New project**, **Open project**, your recent projects, and a practice mission. Unsaved work from the previous session appears as a **recovery draft** instead of silently opening in the planner. The practice mission uses illustrative terrain heights and is not flight-ready.
+
+<img src="docs/images/project-home.webp" alt="Project home with New project, Open project, two recent project snapshots, the practice mission, and map setup guidance" width="100%">
+
+In the planner, **Plan**, **Create**, **Light**, and **Safety** organize the existing controls. The project header shows whether changes are saved to a file and whether a local recovery copy is available. **Save** (`Ctrl+S`) updates the current desktop file; **Save as…** (`Ctrl+Shift+S`) creates a separate copy. Creating/opening another project or closing the desktop app asks you to save, discard, or cancel when there are unsaved changes.
+
+<details>
+<summary><b>See recovery drafts and unsaved-change protection</b></summary>
+
+An unsaved local draft appears above recent projects after restarting. **Recover** opens it for review without silently overwriting the saved project file.
+
+<img src="docs/images/project-recovery.webp" alt="Project home after a restart, offering recovery of unsaved changes to the Eiffel Tower helix study above the recent-project list" width="100%">
+
+Switching away from an edited project offers **Save changes**, **Discard changes**, or **Cancel**.
+
+<p align="center">
+  <img src="docs/images/dialog-unsaved.png" alt="Save your changes dialog for an edited project, with Discard changes, Cancel, and Save changes buttons" width="500">
+</p>
+
+</details>
+
+Recovery is a best-effort local backup, **not a substitute for saving a `.odc.json` file**. In the browser, saving downloads a file and recent projects reopen the last saved browser snapshot; use **Open project** to read the latest file from disk. See [Projects and recovery](docs/projects.md) for details.
 
 ### 1. Plan on a real 3D globe
 
@@ -84,7 +113,7 @@ Click **Waypoint** (`W`) and then click the globe to add waypoints, or click **P
   </tr>
 </table>
 
-Use **Undo/Redo** (`Ctrl+Z` / `Ctrl+Y`) freely: the mission autosaves, and **Save…** / **Open…** store it as a `.odc.json` file.
+Use **Undo/Redo** (`Ctrl+Z` / `Ctrl+Y`) freely within a project. Edits update a local recovery draft; **Save** / **Open** store and load portable `.odc.json` files. Opening a different project starts a fresh undo history.
 
 ### 2. Aim the camera exactly
 
@@ -109,10 +138,10 @@ The POI tracking is computed for every frame of the flight, not only at the wayp
 
 The **camera view** renders exactly what the drone camera will record. It uses the profile's horizontal field of view (72° for a 24 mm-equivalent lens), the video's 16:9 frame, and a rule-of-thirds overlay. The HUD shows heading, gimbal, speed, altitude, height above ground, distance from home, FOV and the sun (its height, and whether the shot is backlit, front-lit or side-lit, or the sun is in frame).
 
-- Press **Tab**, click the mini-screen, or use **🎥 Camera view / 🗺 Map view** to swap the main screen and the mini-screen.
+- With the map canvas focused, press **Tab**, click the mini-screen, or use **Camera view / Map view** to swap the main screen and the mini-screen.
 - Drag the mini-screen's top bar to move it, and its top-left corner to resize it. The layout is remembered.
-- Press **L** or **▣ Mini-screen / ◫ Split** to show the map and camera side by side. **⬌ / ⬍** stacks them instead; drag the divider to resize, double-click it to centre.
-- **🔍** sets the map's mouse-wheel zoom speed (slow, normal, fast or anything between), and **Snappy** stops the zoom as soon as the wheel stops.
+- Press **L** or **Mini-screen / Split** to show the map and camera side by side. **⬌ / ⬍** stacks them instead; drag the divider to resize, double-click it to centre.
+- The map zoom control (**1×** by default) sets mouse-wheel zoom speed (slow, normal, fast or anything between), and **Snappy** stops the zoom as soon as the wheel stops.
 - Press **Space** or ▶ to play the flight, and scrub the timeline. The numbered ticks on the timeline jump to each waypoint.
 
 #### Zoom, dolly zoom and framing guides
@@ -139,9 +168,9 @@ Golden hour is when the sun is between 4° below and 6° above the horizon; blue
 
 ### 4. Fly mode: plan by flying
 
-<img src="docs/images/fly-mode.webp" alt="Fly mode: FLY HUD, crosshair, key legend, path recording indicator and chase-cam mini-map" width="100%">
+<img src="docs/images/fly-mode.webp" alt="Fly mode in the updated planner: the FLY HUD, centre crosshair, keyboard controls, and chase-camera mini-map" width="100%">
 
-Press **F** (or **✈ Fly**) to take control of a virtual drone from the camera view, and scout the shot the way you'd fly it. It behaves like a drone in normal mode: it uses the profile's speed and climb limits, accelerates and brakes smoothly, hovers when you let go, and won't fly into terrain or buildings. The mini-map switches to a chase view behind the drone.
+Press **F** (or **Fly**) to take control of a virtual drone from the camera view, and scout the shot the way you'd fly it. It behaves like a drone in normal mode: it uses the profile's speed and climb limits, accelerates and brakes smoothly, hovers when you let go, and won't fly into terrain or buildings. The mini-map switches to a chase view behind the drone.
 
 | Action                                                                | Keyboard / mouse         | Gamepad (Mode 2) |
 | --------------------------------------------------------------------- | ------------------------ | ---------------- |
@@ -163,7 +192,7 @@ A recorded path is simplified into waypoints that keep your **position, camera y
   <tr>
     <td width="40%" valign="top"><img src="docs/images/panel-shots.png" alt="Shot templates panel with Helix selected" width="100%"></td>
     <td valign="top">
-      <p>Select a POI, pick a move, set distance and height, and click <b>Replace waypoints</b> or <b>Append</b>. Waypoints get the real ground height under them.</p>
+      <p>Select a POI, open <b>Create</b>, pick a move, set distance and height, and click <b>Replace waypoints</b> or <b>Append</b>. Waypoints get the real ground height under them.</p>
       <ul>
         <li><b>Orbit</b>: circle the subject at a constant height with the camera locked on</li>
         <li><b>Helix</b>: orbit while climbing</li>
@@ -178,7 +207,7 @@ A recorded path is simplified into waypoints that keep your **position, camera y
 
 ### 6. Survey grids for mapping
 
-Open **Survey**, click **Draw area** (or press `G`) and click the corners of the area on the globe. Drag the green corners to adjust; undo removes the last one. Then set:
+Open **Create → Survey**, click **Draw area** (or press `G`) and click the corners of the area on the globe. Drag the green corners to adjust; undo removes the last one. Then set:
 
 - **Height (AGL)**: sets the ground sample distance (GSD), shown live in cm/px for the selected drone's camera
 - **Front / side overlap**: the spacing between photos along a line and between lines (75% / 65% by default)
@@ -195,7 +224,7 @@ Distance-triggered photos export as Litchi `photo_distinterval`, DJI WPML `multi
 
 <table>
   <tr>
-    <td width="40%" valign="top"><img src="docs/images/panel-safety.png" alt="Safety panel showing battery use and an above-120 m warning" width="100%"></td>
+    <td width="40%" valign="top"><img src="docs/images/panel-safety.png" alt="The Safety tab's panel showing battery use, clearance, maximum height, and an above-120 m warning with distances along the route" width="100%"></td>
     <td valign="top">
       <p>The app samples the ground under the whole path (terrain <i>and</i> 3D buildings) and re-checks the flight after every edit.</p>
       <ul>
@@ -246,13 +275,13 @@ Distance-triggered photos export as Litchi `photo_distinterval`, DJI WPML `multi
   </tr>
 </table>
 
-<img src="docs/images/rendering.webp" alt="Live REC overlay showing format, frame progress, file size and ETA" width="100%">
+<img src="docs/images/rendering.webp" alt="An actual short camera-test render in progress: the REC overlay shows WebM 720p at 24 fps, completed frames, file size, and estimated time remaining" width="100%">
 
 While it renders, a **REC overlay** shows the frame count, file size, time remaining and any frames where tiles were slow to load. You can cancel at any time.
 
 ### 10. Takes and side-by-side compare
 
-<img src="docs/images/takes-compare.webp" alt="Compare mode: live 3D camera view on the left, rendered take on the right, at the same moment" width="100%">
+<img src="docs/images/takes-compare.webp" alt="Comparing a short camera test: the live camera view on the left and the completed rendered take on the right, synchronized to the timeline" width="100%">
 
 Every render becomes a **take** that plays right inside the camera view. Open **🎞 Takes** to replay, save or delete a take, or click **⇆ Compare** to play it side by side with the live 3D view. Both sides follow the timeline, so you can change the plan and see the difference straight away.
 
@@ -332,14 +361,16 @@ npm run tauri build
 
 ## ⌨️ Keyboard shortcuts
 
-| Key   | Action        | Key                 | Action              |
-| ----- | ------------- | ------------------- | ------------------- |
-| `V`   | Select tool   | `Space`             | Play / pause        |
-| `W`   | Add waypoints | `Tab`               | Swap camera / map   |
-| `P`   | Add POI       | `F`                 | Fly mode            |
-| `T`   | Set takeoff   | `Del`               | Delete selected     |
-| `G`   | Draw survey   | `L`                 | Split / mini-screen |
-| `Esc` | Cancel / exit | `Ctrl+Z` / `Ctrl+Y` | Undo / redo         |
+| Key      | Action        | Key                 | Action                |
+| -------- | ------------- | ------------------- | --------------------- |
+| `V`      | Select tool   | `Space`             | Play / pause          |
+| `W`      | Add waypoints | `Tab`               | Swap camera / map     |
+| `P`      | Add POI       | `F`                 | Fly mode              |
+| `T`      | Set takeoff   | `Del`               | Delete selected       |
+| `G`      | Draw survey   | `L`                 | Split / mini-screen   |
+| `Esc`    | Cancel / exit | `Ctrl+Z` / `Ctrl+Y` | Undo / redo           |
+| `Ctrl+N` | New project   | `Ctrl+O`            | Open project / import |
+| `Ctrl+S` | Save project  | `Ctrl+Shift+S`      | Save project as…      |
 
 ---
 

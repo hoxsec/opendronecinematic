@@ -194,13 +194,132 @@ export function hoverSeconds(wp: Waypoint): number {
 
 const round2 = (v: number) => Math.round(v * 100) / 100;
 
-/** Parse and minimally validate a saved project file. */
+const finiteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+const record = (value: unknown) =>
+  value !== null && typeof value === 'object' && !Array.isArray(value);
+const validPosition = (value: unknown) => {
+  if (!record(value)) return false;
+  const p = value as { lat: number; lon: number };
+  return (
+    finiteNumber(p.lat) && Math.abs(p.lat) <= 90 && finiteNumber(p.lon) && Math.abs(p.lon) <= 180
+  );
+};
+
+function requireProject(condition: unknown, field: string): asserts condition {
+  if (!condition) throw new Error(`Invalid OpenDroneCinematic project: ${field}.`);
+}
+
+/** Validate before replacing a live project; corrupt files must never break the editor or recovery. */
 export function parseMission(json: string): Mission {
   const m = JSON.parse(json) as Mission;
-  if (m?.version !== 1 || !Array.isArray(m.waypoints) || !m.takeoff) {
+  if (!record(m) || m?.version !== 1 || !Array.isArray(m.waypoints) || !m.takeoff) {
     throw new Error('Not an OpenDroneCinematic mission file (version 1).');
   }
-  return { ...m, pois: m.pois ?? [], settings: { ...DEFAULT_SETTINGS, ...m.settings } };
+  requireProject(
+    typeof m.id === 'string' && m.id.length > 0 && typeof m.name === 'string',
+    'project ID or name',
+  );
+  requireProject(
+    typeof m.droneProfileId === 'string' && m.droneProfileId.length > 0,
+    'drone profile',
+  );
+  requireProject(
+    ['relativeToTakeoff', 'AGL', 'ellipsoid'].includes(m.altitudeMode),
+    'altitude mode',
+  );
+  requireProject(
+    validPosition(m.takeoff) && finiteNumber(m.takeoff.groundHeight),
+    'takeoff coordinates or ground height',
+  );
+  requireProject(m.settings === undefined || record(m.settings), 'mission settings');
+  const settings = { ...DEFAULT_SETTINGS, ...m.settings };
+  requireProject(
+    finiteNumber(settings.speed) && finiteNumber(settings.gimbalPitch),
+    'mission speed or gimbal pitch',
+  );
+  requireProject(
+    ['smooth', 'straight'].includes(settings.pathMode) &&
+      ['hover', 'returnHome', 'land'].includes(settings.finishAction),
+    'path mode or finish action',
+  );
+  const ids = new Set<string>();
+  const uniqueId = (id: unknown) => {
+    if (typeof id !== 'string' || !id || ids.has(id)) return false;
+    ids.add(id);
+    return true;
+  };
+  for (const [i, w] of m.waypoints.entries()) {
+    const label = `waypoint ${i + 1}`;
+    requireProject(
+      validPosition(w) && uniqueId(w?.id) && finiteNumber(w.alt) && finiteNumber(w.groundHeight),
+      `${label} coordinates, height, or ID`,
+    );
+    requireProject(
+      ['auto', 'fixed', 'poi'].includes(w.heading) && ['fixed', 'poi'].includes(w.gimbal),
+      `${label} camera modes`,
+    );
+    for (const field of ['speed', 'headingDeg', 'gimbalPitch', 'focalMm'] as const)
+      requireProject(w[field] === undefined || finiteNumber(w[field]), `${label} ${field}`);
+    requireProject(
+      w.zoomLock === undefined || typeof w.zoomLock === 'boolean',
+      `${label} zoom lock`,
+    );
+    requireProject(w.poiId === undefined || typeof w.poiId === 'string', `${label} POI reference`);
+    requireProject(Array.isArray(w.actions), `${label} actions`);
+    for (const a of w.actions) {
+      requireProject(record(a), `${label} action`);
+      requireProject(
+        ['hover', 'photo', 'startRecording', 'stopRecording', 'photoDistance'].includes(a.type),
+        `${label} action type`,
+      );
+      if (a.type === 'hover') requireProject(finiteNumber(a.seconds), `${label} hover duration`);
+      if (a.type === 'photoDistance')
+        requireProject(finiteNumber(a.meters), `${label} photo distance`);
+    }
+  }
+  const pois = m.pois ?? [];
+  requireProject(Array.isArray(pois), 'points of interest');
+  for (const p of pois)
+    requireProject(
+      validPosition(p) && uniqueId(p?.id) && typeof p.name === 'string' && finiteNumber(p.height),
+      'POI coordinates, height, name, or ID',
+    );
+  if (m.survey !== undefined) {
+    requireProject(
+      record(m.survey) && Array.isArray(m.survey.polygon) && m.survey.polygon.every(validPosition),
+      'survey outline',
+    );
+    for (const field of [
+      'height',
+      'frontOverlap',
+      'sideOverlap',
+      'angle',
+      'overshoot',
+      'gimbalPitch',
+      'terrainFollowSpacing',
+    ] as const)
+      requireProject(finiteNumber(m.survey[field]), `survey ${field}`);
+    requireProject(
+      typeof m.survey.crosshatch === 'boolean' &&
+        (m.survey.speed === undefined || finiteNumber(m.survey.speed)),
+      'survey options',
+    );
+  }
+  if (m.customProfile !== undefined) {
+    requireProject(record(m.customProfile), 'custom drone profile');
+    for (const value of Object.values(m.customProfile))
+      requireProject(finiteNumber(value), 'custom drone specification');
+  }
+  if (m.shoot !== undefined)
+    requireProject(
+      record(m.shoot) &&
+        typeof m.shoot.start === 'string' &&
+        Number.isFinite(Date.parse(m.shoot.start)) &&
+        finiteNumber(m.shoot.utcOffset),
+      'shoot date or UTC offset',
+    );
+  return { ...m, pois, settings };
 }
 
 export function serializeMission(m: Mission): string {
