@@ -5,11 +5,17 @@ import { usePath } from '../derived';
 
 export function SafetyPanel() {
   const safety = useStore((s) => s.safety);
+  const pending = useStore((s) => s.safetyPending);
   const mission = useStore((s) => s.mission);
   const { setTime, select } = useStore.getState();
   const path = usePath();
   if (mission.waypoints.length === 0) return null;
-  if (!safety) return <Section title="Safety">Checking…</Section>;
+  if (!safety)
+    return (
+      <Section title="Safety">
+        {pending ? 'Checking in background…' : 'Safety check unavailable.'}
+      </Section>
+    );
 
   const errors = safety.issues.filter((i) => i.severity === 'error').length;
   const pct = Math.round(safety.batteryUsedFraction * 100);
@@ -30,6 +36,11 @@ export function SafetyPanel() {
 
   return (
     <Section title={errors ? `Safety · ${errors} error${errors > 1 ? 's' : ''}` : 'Safety'}>
+      {pending && (
+        <p className="note" role="status">
+          Updating safety in the background. Results below are from the previous check.
+        </p>
+      )}
       <div
         className="battery"
         title="Estimated battery use, including transit from and back to takeoff"
@@ -39,19 +50,42 @@ export function SafetyPanel() {
           className={pct > 100 ? 'bad' : pct > 75 ? 'warn' : ''}
         />
       </div>
-      <p className="stats">
-        ~{fmtTime(safety.totalSeconds)} total · {pct}% battery
-        {safety.minClearance !== undefined &&
-          ` · min clearance ${Math.round(safety.minClearance)} m`}
-        {safety.maxAgl !== undefined && ` · max ${Math.round(safety.maxAgl)} m AGL`}
-      </p>
+      <div className="safety-stats">
+        <span>
+          Estimated duration <strong>{fmtTime(safety.totalSeconds)}</strong>
+        </span>
+        <span>
+          Battery used <strong>{pct}%</strong>
+        </span>
+        {safety.minClearance !== undefined && (
+          <span>
+            Minimum clearance <strong>{Math.round(safety.minClearance)} m</strong>
+          </span>
+        )}
+        {safety.maxAgl !== undefined && (
+          <span>
+            Maximum height above ground <strong>{Math.round(safety.maxAgl)} m</strong>
+          </span>
+        )}
+      </div>
       {safety.issues.length === 0 ? (
         <p className="ok">No issues found.</p>
       ) : (
         <ul className="issues">
           {safety.issues.map((i, k) => (
-            <li key={k} className={i.severity} onClick={() => jump(i.from, i.waypointIndex)}>
-              {i.message}
+            <li key={k} className={i.severity}>
+              <button className="issue-button" onClick={() => jump(i.from, i.waypointIndex)}>
+                <strong className="issue-severity">
+                  {i.severity === 'error' ? '⚠ Error' : '⚠ Warning'}
+                </strong>
+                <span>{i.message}</span>
+                {i.from !== undefined && (
+                  <span className="issue-distance">
+                    Along route: {Math.round(i.from)} m
+                    {i.to !== undefined && i.to !== i.from ? ` – ${Math.round(i.to)} m` : ''}
+                  </span>
+                )}
+              </button>
             </li>
           ))}
         </ul>

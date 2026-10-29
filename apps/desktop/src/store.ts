@@ -26,6 +26,11 @@ import {
 import { loadDemFile } from './demStore';
 
 export type Mode = 'select' | 'addWaypoint' | 'addPoi' | 'setTakeoff' | 'drawSurvey';
+export interface SelectionModifiers {
+  toggle?: boolean;
+  range?: boolean;
+}
+export const PLAYBACK_RATES = [0.5, 1, 1.5, 2, 2.5, 3] as const;
 
 const SETTINGS_KEY = 'odc.settings.v1';
 const AUTOSAVE_KEY = 'odc.autosave.v1';
@@ -59,9 +64,13 @@ interface State {
   past: Mission[];
   future: Mission[];
   selectedId?: string;
+  selectedWaypointIds: string[];
+  selectionAnchor?: string;
   mode: Mode;
   time: number;
   playing: boolean;
+  playbackRate: number;
+  safetyPending: boolean;
   safety?: SafetyReport;
   settings: DataSourceSettings;
   /** The decoded GeoTIFF terrain, when one is loaded. */
@@ -74,10 +83,12 @@ interface State {
   setMission(next: Mission | ((m: Mission) => Mission), opts?: { history?: boolean }): void;
   undo(): void;
   redo(): void;
-  select(id?: string): void;
+  select(id?: string, modifiers?: SelectionModifiers): void;
   setMode(mode: Mode): void;
   setTime(t: number): void;
   setPlaying(p: boolean): void;
+  setPlaybackRate(rate: number): void;
+  setSafetyPending(pending: boolean): void;
   setSafety(s?: SafetyReport): void;
   setSettings(s: Partial<DataSourceSettings>): void;
   setDem(dem?: Dem): void;
@@ -88,7 +99,12 @@ interface State {
   /** Append ready-made waypoints (fly-mode captures). */
   appendWaypoints(wps: Waypoint[]): void;
   updateWaypoint(id: string, patch: Partial<Waypoint>, opts?: { history?: boolean }): void;
+  updateWaypoints(
+    ids: string[],
+    patch: Partial<Waypoint> | ((wp: Waypoint) => Partial<Waypoint>),
+  ): void;
   removeWaypoint(id: string): void;
+  removeWaypoints(ids: string[]): void;
   moveWaypoint(id: string, delta: -1 | 1): void;
   addPoiAt(pos: Geodetic): void;
   updatePoi(id: string, patch: Partial<PointOfInterest>, opts?: { history?: boolean }): void;
@@ -101,13 +117,37 @@ interface State {
   moveSurveyVertex(index: number, pos: Geodetic, opts?: { history?: boolean }): void;
 }
 
+function selectionAfterEdit(
+  state: Pick<State, 'selectedId' | 'selectedWaypointIds' | 'selectionAnchor'>,
+  mission: Mission,
+) {
+  const ids = state.selectedWaypointIds.filter((id) => mission.waypoints.some((w) => w.id === id));
+  const selectedId =
+    state.selectedId &&
+    (mission.waypoints.some((w) => w.id === state.selectedId) ||
+      mission.pois.some((p) => p.id === state.selectedId))
+      ? state.selectedId
+      : ids.at(-1);
+  return {
+    selectedId,
+    selectedWaypointIds:
+      ids.length === state.selectedWaypointIds.length ? state.selectedWaypointIds : ids,
+    selectionAnchor: mission.waypoints.some((w) => w.id === state.selectionAnchor)
+      ? state.selectionAnchor
+      : ids.at(-1),
+  };
+}
+
 export const useStore = create<State>((set, get) => ({
   mission: loadAutosave(),
   past: [],
   future: [],
+  selectedWaypointIds: [],
   mode: 'select',
   time: 0,
   playing: false,
+  playbackRate: 1,
+  safetyPending: false,
   settings: loadSettings(),
   focusToken: 0,
 
@@ -119,24 +159,63 @@ export const useStore = create<State>((set, get) => ({
       mission,
       past: opts.history === false ? s.past : [...s.past.slice(-HISTORY_LIMIT + 1), prev],
       future: opts.history === false ? s.future : [],
+      ...selectionAfterEdit(s, mission),
     }));
   },
   undo() {
     const { past, mission, future } = get();
     const prev = past[past.length - 1];
     if (!prev) return;
-    set({ mission: prev, past: past.slice(0, -1), future: [mission, ...future] });
+    set({
+      mission: prev,
+      past: past.slice(0, -1),
+      future: [mission, ...future],
+      ...selectionAfterEdit(get(), prev),
+    });
   },
   redo() {
     const { past, mission, future } = get();
     const next = future[0];
     if (!next) return;
-    set({ mission: next, past: [...past, mission], future: future.slice(1) });
+    set({
+      mission: next,
+      past: [...past, mission],
+      future: future.slice(1),
+      ...selectionAfterEdit(get(), next),
+    });
   },
-  select: (selectedId) => set({ selectedId }),
+  select(id, modifiers = {}) {
+    const s = get();
+    const index = s.mission.waypoints.findIndex((w) => w.id === id);
+    if (index < 0) {
+      set({ selectedId: id, selectedWaypointIds: [], selectionAnchor: undefined });
+      return;
+    }
+    let ids = [id!];
+    const anchor = s.mission.waypoints.findIndex((w) => w.id === s.selectionAnchor);
+    if (modifiers.range && anchor >= 0) {
+      const range = s.mission.waypoints
+        .slice(Math.min(anchor, index), Math.max(anchor, index) + 1)
+        .map((w) => w.id);
+      ids = modifiers.toggle ? [...new Set([...s.selectedWaypointIds, ...range])] : range;
+    } else if (modifiers.toggle) {
+      ids = s.selectedWaypointIds.includes(id!)
+        ? s.selectedWaypointIds.filter((selected) => selected !== id)
+        : [...s.selectedWaypointIds, id!];
+    }
+    set({
+      selectedId: ids.includes(id!) ? id : ids.at(-1),
+      selectedWaypointIds: ids,
+      selectionAnchor: modifiers.range && anchor >= 0 ? s.selectionAnchor : id,
+    });
+  },
   setMode: (mode) => set({ mode }),
   setTime: (time) => set({ time }),
   setPlaying: (playing) => set({ playing }),
+  setPlaybackRate: (playbackRate) => {
+    if (PLAYBACK_RATES.some((rate) => rate === playbackRate)) set({ playbackRate });
+  },
+  setSafetyPending: (safetyPending) => set({ safetyPending }),
   setSafety: (safety) => set({ safety }),
   setSettings(patch) {
     const settings = { ...get().settings, ...patch };
@@ -179,14 +258,15 @@ export const useStore = create<State>((set, get) => ({
         gimbalPitch: last?.gimbalPitch,
         poiId: last?.poiId,
       });
-      set({ selectedId: wp.id });
+      // The waypoint is not in the old mission yet.
+      set({ selectedId: wp.id, selectedWaypointIds: [wp.id], selectionAnchor: wp.id });
       return { ...mission, waypoints: [...mission.waypoints, wp] };
     });
   },
   appendWaypoints(wps) {
     if (!wps.length) return;
     get().setMission((m) => ({ ...m, waypoints: [...m.waypoints, ...wps] }));
-    set({ selectedId: wps[wps.length - 1]!.id });
+    get().select(wps[wps.length - 1]!.id);
   },
   updateWaypoint(id, patch, opts) {
     get().setMission(
@@ -194,9 +274,24 @@ export const useStore = create<State>((set, get) => ({
       opts,
     );
   },
+  updateWaypoints(ids, patch) {
+    const selected = new Set(ids);
+    if (!get().mission.waypoints.some((w) => selected.has(w.id))) return;
+    get().setMission((m) => ({
+      ...m,
+      waypoints: m.waypoints.map((w) =>
+        selected.has(w.id)
+          ? { ...w, ...(typeof patch === 'function' ? patch(w) : patch), id: w.id }
+          : w,
+      ),
+    }));
+  },
   removeWaypoint(id) {
-    get().setMission((m) => ({ ...m, waypoints: m.waypoints.filter((w) => w.id !== id) }));
-    if (get().selectedId === id) set({ selectedId: undefined });
+    get().removeWaypoints([id]);
+  },
+  removeWaypoints(ids) {
+    const selected = new Set(ids);
+    get().setMission((m) => ({ ...m, waypoints: m.waypoints.filter((w) => !selected.has(w.id)) }));
   },
   moveWaypoint(id, delta) {
     get().setMission((m) => {
@@ -217,7 +312,8 @@ export const useStore = create<State>((set, get) => ({
       height: pos.height + 2,
     };
     get().setMission((m) => ({ ...m, pois: [...m.pois, poi] }));
-    set({ selectedId: poi.id, mode: 'select' });
+    get().select(poi.id);
+    set({ mode: 'select' });
   },
   updatePoi(id, patch, opts) {
     get().setMission(

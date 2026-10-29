@@ -8,6 +8,7 @@
     "packages/*/src",
     "packages/*/test",
     "apps/desktop/src",
+    "apps/desktop/test",
     "apps/desktop/vite.config.ts",
     "vitest.config.ts"
   ]

@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import {
-  evaluateSafety,
   waypointHeight,
   altFromHeight,
   profileFov,
@@ -18,6 +17,7 @@ import {
 import { useStore } from '../store';
 import { getPath, useCamera, usePath, useSunTime } from '../derived';
 import { useView } from '../viewStore';
+import { runAnalysis } from '../analysisWorker';
 
 /** Exposed so other panels (shot templates) can sample ground heights. */
 export let activeScene: MissionScene | undefined;
@@ -25,8 +25,10 @@ export let activeScene: MissionScene | undefined;
 export function GlobeView() {
   const ref = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<MissionScene | undefined>(undefined);
+  const obstacleBases = useRef(new WeakMap<Obstacle, number>());
   const mission = useStore((s) => s.mission);
   const selectedId = useStore((s) => s.selectedId);
+  const selectedIds = useStore((s) => s.selectedWaypointIds);
   const settings = useStore((s) => s.settings);
   const dem = useStore((s) => s.dem);
   const time = useStore((s) => s.time);
@@ -100,10 +102,10 @@ export function GlobeView() {
         else if (md === 'drawSurvey') st().addSurveyVertex(pos);
         else st().select(undefined);
       },
-      onSelect(t: PickTarget) {
+      onSelect(t: PickTarget, modifiers) {
         dragStarted = false;
         // Takeoff and survey corners have no panel selection; their arrows live in the scene.
-        st().select(t.kind === 'waypoint' || t.kind === 'poi' ? t.id : undefined);
+        st().select(t.kind === 'waypoint' || t.kind === 'poi' ? t.id : undefined, modifiers);
       },
       onAxisDrag(t, axis, pos) {
         const history = !dragStarted;
@@ -176,8 +178,8 @@ export function GlobeView() {
   }, []);
 
   useEffect(() => {
-    sceneRef.current?.render(mission, path, { selectedId, issues: safety?.issues });
-  }, [mission, path, selectedId, safety]);
+    sceneRef.current?.render(mission, path, { selectedId, selectedIds, issues: safety?.issues });
+  }, [mission, path, selectedId, selectedIds, safety]);
 
   useEffect(() => {
     // In fly mode the fly controller drives the drone marker instead of the timeline.
@@ -196,28 +198,56 @@ export function GlobeView() {
 
   // Safety: sample the ground under the path after edits settle.
   useEffect(() => {
+    obstacleBases.current = new WeakMap();
+  }, [settings, dem]);
+
+  useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
-    let cancelled = false;
+    const controller = new AbortController();
+    const { signal } = controller;
+    useStore.getState().setSafetyPending(true);
     const timer = setTimeout(async () => {
-      const p = getPath(mission);
-      const samples = p.sampleByDistance(Math.max(5, p.length / 400));
-      const positions = samples.map((s) => s.position);
-      const [ground, obstacles] = await Promise.all([
-        scene.sampleGround(positions),
-        obstaclesNear(settings, positions),
-      ]);
-      if (cancelled) return;
-      useStore
-        .getState()
-        .setSafety(evaluateSafety(mission, p, samples, ground, undefined, obstacles.all));
-      const bases = await scene.sampleGround(
-        obstacles.shown.map((o) => ({ lon: o.coords[0]![0], lat: o.coords[0]![1] })),
-      );
-      if (!cancelled) scene.setObstacles(obstacles.shown, bases);
+      try {
+        const p = getPath(mission);
+        const samples = p.sampleByDistance(Math.max(5, p.length / 400));
+        const positions = samples.map((s) => s.position);
+        const [ground, obstacles] = await Promise.all([
+          scene.sampleGround(positions, signal),
+          obstaclesNear(settings, positions),
+        ]);
+        signal.throwIfAborted();
+        const result = await runAnalysis(
+          { kind: 'safety', mission, ground, obstacles: obstacles.all },
+          signal,
+        );
+        signal.throwIfAborted();
+        if (result.kind === 'safety') useStore.getState().setSafety(result.report);
+        useStore.getState().setSafetyPending(false);
+        const missing = obstacles.shown.filter((o) => !obstacleBases.current.has(o));
+        const sampledBases = await scene.sampleGround(
+          missing.map((o) => ({ lon: o.coords[0]![0], lat: o.coords[0]![1] })),
+          signal,
+        );
+        signal.throwIfAborted();
+        missing.forEach((o, i) => {
+          const height = sampledBases[i];
+          if (height !== undefined) obstacleBases.current.set(o, height);
+        });
+        scene.setObstacles(
+          obstacles.shown,
+          obstacles.shown.map((o) => obstacleBases.current.get(o)),
+        );
+      } catch (error) {
+        if (!signal.aborted) {
+          useStore.getState().setSafetyPending(false);
+          useStore.getState().setSafety(undefined);
+          useStore.getState().notify(`Safety check failed: ${String(error)}`, 'error');
+        }
+      }
     }, 400);
     return () => {
-      cancelled = true;
+      controller.abort();
       clearTimeout(timer);
     };
   }, [mission, settings, dem]);

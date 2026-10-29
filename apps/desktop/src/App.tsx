@@ -53,7 +53,7 @@ export function App() {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setDialog(undefined);
       const el = e.target as HTMLElement;
-      if (el.closest('input, select, textarea')) return;
+      if (el.closest('input, select, textarea, [role="slider"], [contenteditable="true"]')) return;
       const st = useStore.getState();
       const view = useView.getState();
       const mod = e.ctrlKey || e.metaKey;
@@ -62,11 +62,13 @@ export function App() {
       else if (mod && e.key.toLowerCase() === 'y') (st.redo(), e.preventDefault());
       else if (e.key === 'Escape') st.setMode('select');
       else if (e.key === 'Tab') (e.preventDefault(), !view.fly && view.swap());
-      else if (e.key === ' ') (st.setPlaying(!st.playing), e.preventDefault());
+      else if (e.key === ' ' && !el.closest('button'))
+        (st.setPlaying(!st.playing), e.preventDefault());
       else if (e.key === 'Delete' || e.key === 'Backspace') {
         const id = st.selectedId;
         if (!id) return;
-        if (st.mission.waypoints.some((w) => w.id === id)) st.removeWaypoint(id);
+        if (st.mission.waypoints.some((w) => w.id === id))
+          st.removeWaypoints(st.selectedWaypointIds.length ? st.selectedWaypointIds : [id]);
         else if (st.mission.pois.some((p) => p.id === id)) st.removePoi(id);
       } else if (!mod && e.key.toLowerCase() === 'l') {
         view.setLayout(view.layout === 'split' ? 'pip' : 'split');

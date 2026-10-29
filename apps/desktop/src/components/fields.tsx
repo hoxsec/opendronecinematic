@@ -28,6 +28,7 @@ export function NumberInput({
   min,
   max,
   suffix,
+  placeholder,
 }: {
   value: number | undefined;
   onChange: (v: number) => void;
@@ -35,6 +36,7 @@ export function NumberInput({
   min?: number;
   max?: number;
   suffix?: string;
+  placeholder?: string;
 }) {
   const [text, setText] = useState(value === undefined ? '' : String(value));
   useEffect(() => {
@@ -47,6 +49,7 @@ export function NumberInput({
       <input
         type="number"
         value={text}
+        placeholder={placeholder}
         step={step}
         min={min}
         max={max}

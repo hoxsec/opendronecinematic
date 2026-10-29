@@ -14,6 +14,7 @@ import {
 } from 'cesium';
 import { sampleTerrainHeights } from './terrain';
 import type { VectorTileSource } from './vectorTiles';
+import { yieldToBrowser } from './scheduling';
 
 interface Footprint {
   ring: [number, number][];
@@ -84,7 +85,7 @@ export class LocalBuildings {
   }
 
   /** Load the tiles under these positions (for safety checks away from the camera). */
-  async ensure(positions: { lat: number; lon: number }[]) {
+  async ensure(positions: { lat: number; lon: number }[], signal?: AbortSignal) {
     if (!this.available) return;
     const keys = new Map<string, [number, number]>();
     for (const p of positions) {
@@ -92,7 +93,13 @@ export class LocalBuildings {
       keys.set(`${x}/${y}`, [x, y]);
       if (keys.size >= MAX_ENSURE_TILES) break;
     }
-    await Promise.all([...keys.values()].map(([x, y]) => this.load(x, y).ready));
+    const tiles = [...keys.values()];
+    for (let i = 0; i < tiles.length; i += 4) {
+      signal?.throwIfAborted();
+      if (this.destroyed) return;
+      await Promise.all(tiles.slice(i, i + 4).map(([x, y]) => this.load(x, y).ready));
+      await yieldToBrowser();
+    }
   }
 
   /** Roof height (ellipsoid) of the tallest loaded building containing the point. */
@@ -171,6 +178,10 @@ export class LocalBuildings {
 
     const shapes: { rings: [number, number][][]; height: number; min: number }[] = [];
     for (let i = 0; i < layer.length; i++) {
+      if (i > 0 && i % 32 === 0) {
+        await yieldToBrowser();
+        if (this.destroyed) return;
+      }
       const f = layer.feature(i);
       if (f.type !== 3) continue;
       const height = Number(f.properties.height) || DEFAULT_HEIGHT;
@@ -192,11 +203,15 @@ export class LocalBuildings {
     if (this.destroyed) return;
 
     const instances: GeometryInstance[] = [];
-    shapes.forEach((s, i) => {
+    for (const [i, s] of shapes.entries()) {
+      if (i > 0 && i % 32 === 0) {
+        await yieldToBrowser();
+        if (this.destroyed) return;
+      }
       // Sink the base a little so buildings on slopes don't float.
       const base = (Number.isFinite(bases[i]) ? bases[i]! : 0) - 2;
       const [outer, ...holes] = s.rings;
-      if (!outer || outer.length < 4) return;
+      if (!outer || outer.length < 4) continue;
       const bbox: Footprint['bbox'] = [Infinity, Infinity, -Infinity, -Infinity];
       for (const [lon, lat] of outer) {
         bbox[0] = Math.min(bbox[0], lon);
@@ -219,7 +234,7 @@ export class LocalBuildings {
           attributes: { color: ColorGeometryInstanceAttribute.fromColor(COLOR) },
         }),
       );
-    });
+    }
     if (!instances.length) return;
     tile.primitive = this.scene.primitives.add(
       new Primitive({

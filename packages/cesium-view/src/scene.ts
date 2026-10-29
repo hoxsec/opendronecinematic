@@ -50,6 +50,8 @@ import { sampleTerrainHeights } from './terrain';
 import { applyPose, type CameraPose } from './pose';
 import { applySunLight } from './lighting';
 import { AXES, AxisGizmo, axisDirection, closestOnLine, gizmoAxis, type Axis } from './gizmo';
+import { EntityBatch } from './entities';
+import { yieldToBrowser } from './scheduling';
 
 export type PickTarget =
   | { kind: 'waypoint' | 'poi'; id: string }
@@ -61,7 +63,7 @@ export interface SceneEvents {
   /** A click on empty ground/buildings. */
   onGroundClick?(pos: Geodetic): void;
   /** A click on a mission object. */
-  onSelect?(target: PickTarget): void;
+  onSelect?(target: PickTarget, modifiers?: { toggle?: boolean; range?: boolean }): void;
   /** Continuous while dragging a mission object across the ground. */
   onDrag?(target: PickTarget, pos: Geodetic): void;
   onDragEnd?(target: PickTarget): void;
@@ -115,6 +117,8 @@ export class MissionScene {
   private applied?: AppliedSources;
   private sourcesQueue: Promise<unknown> = Promise.resolve();
   private dragging?: PickTarget;
+  private pendingMove?: Cartesian2;
+  private readonly removeDragUpdate: () => void;
   private readonly gizmo: AxisGizmo;
   /** The object showing the axis arrows. */
   private gizmoTarget?: PickTarget;
@@ -127,6 +131,10 @@ export class MissionScene {
     t0: number;
   };
   private mission?: Mission;
+  private renderedPath?: FlightPath;
+  private pathSamples: ReturnType<FlightPath['sampleByDistance']> = [];
+  private pathPositions: Cartesian3[] = [];
+  private obstacleSnapshot?: { obstacles: Obstacle[]; ground: (number | undefined)[] };
   private droneEntity?: Entity;
   private dem?: Dem;
   private map2D = false;
@@ -178,12 +186,31 @@ export class MissionScene {
       (e: ScreenSpaceEventHandler.MotionEvent) => this.onMove(e.endPosition),
       ScreenSpaceEventType.MOUSE_MOVE,
     );
+    this.removeDragUpdate = scene.preUpdate.addEventListener(() => this.flushMove());
     this.handler.setInputAction(() => this.onUp(), ScreenSpaceEventType.LEFT_UP);
     this.handler.setInputAction(
       (e: ScreenSpaceEventHandler.PositionedEvent) => this.onClick(e.position),
       ScreenSpaceEventType.LEFT_CLICK,
     );
+    // Cesium's event modifiers only cover one key at a time. Capture native modifiers so
+    // Ctrl+Shift works too, and a selection gesture never starts a drag or camera orbit.
+    scene.canvas.addEventListener('pointerdown', this.onModifiedSelect, true);
   }
+
+  private readonly onModifiedSelect = (event: PointerEvent) => {
+    if (event.button !== 0 || !(event.ctrlKey || event.metaKey || event.shiftKey)) return;
+    const bounds = this.viewer.scene.canvas.getBoundingClientRect();
+    const target = this.pickTarget(
+      new Cartesian2(event.clientX - bounds.left, event.clientY - bounds.top),
+    );
+    if (target?.kind !== 'waypoint') return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.events.onSelect?.(target, {
+      toggle: event.ctrlKey || event.metaKey,
+      range: event.shiftKey,
+    });
+  };
 
   /** Apply data sources. Calls run one after another so overlapping changes can't interleave. */
   setSources(settings: DataSourceSettings, dem?: Dem): Promise<string[]> {
@@ -330,6 +357,19 @@ export class MissionScene {
   }
 
   private onMove(pos: Cartesian2) {
+    if (!this.axisDrag && !this.dragging) return;
+    // Mouse events can arrive much faster than frames. Pick and edit only the latest position.
+    this.pendingMove = Cartesian2.clone(pos, this.pendingMove);
+    this.viewer.scene.requestRender();
+  }
+
+  private flushMove() {
+    const pos = this.pendingMove;
+    this.pendingMove = undefined;
+    if (pos) this.applyMove(pos);
+  }
+
+  private applyMove(pos: Cartesian2) {
     const ad = this.axisDrag;
     if (ad) {
       const t = this.axisParam(pos, ad.origin, ad.dir);
@@ -360,6 +400,8 @@ export class MissionScene {
   private onUp() {
     const t = this.axisDrag?.target ?? this.dragging;
     if (!t) return;
+    // Do not lose the last motion when release happens before the next frame.
+    this.flushMove();
     this.dragging = undefined;
     this.axisDrag = undefined;
     this.viewer.scene.screenSpaceCameraController.enableInputs = true;
@@ -435,18 +477,15 @@ export class MissionScene {
   render(
     mission: Mission,
     path: FlightPath,
-    opts: { selectedId?: string; issues?: SafetyIssue[] } = {},
+    opts: { selectedId?: string; selectedIds?: string[]; issues?: SafetyIssue[] } = {},
   ) {
     this.mission = mission;
-    const ents = this.missionLayer.entities;
-    // Remove before suspending: a remove and re-add of the same id in one batch cancels out, and
-    // the visualizers would keep drawing the old entity at its old position.
-    ents.removeAll();
-    ents.suspendEvents();
+    const ents = new EntityBatch(this.missionLayer.entities);
 
     const outline = mission.survey?.polygon ?? [];
     if (outline.length >= 3) {
-      ents.add({
+      ents.upsert({
+        id: 'survey:fill',
         polygon: {
           hierarchy: Cartesian3.fromDegreesArray(outline.flatMap((p) => [p.lon, p.lat])),
           material: COLORS.survey.withAlpha(0.18),
@@ -455,7 +494,8 @@ export class MissionScene {
     }
     if (outline.length >= 2) {
       const ring = outline.length >= 3 ? [...outline, outline[0]!] : outline;
-      ents.add({
+      ents.upsert({
+        id: 'survey:outline',
         polyline: {
           positions: Cartesian3.fromDegreesArray(ring.flatMap((p) => [p.lon, p.lat])),
           width: 2.5,
@@ -465,7 +505,7 @@ export class MissionScene {
       });
     }
     outline.forEach((p, index) => {
-      ents.add({
+      ents.upsert({
         id: entityId({ kind: 'vertex', index }),
         position: Cartesian3.fromDegrees(p.lon, p.lat),
         point: {
@@ -480,7 +520,7 @@ export class MissionScene {
     });
 
     const { takeoff } = mission;
-    ents.add({
+    ents.upsert({
       id: entityId({ kind: 'takeoff' }),
       position: cart({ ...takeoff, height: takeoff.groundHeight }),
       point: {
@@ -495,9 +535,9 @@ export class MissionScene {
 
     mission.waypoints.forEach((wp, i) => {
       const height = waypointHeight(mission, wp);
-      const selected = wp.id === opts.selectedId;
+      const selected = wp.id === opts.selectedId || opts.selectedIds?.includes(wp.id);
       const color = selected ? COLORS.selected : COLORS.waypoint;
-      ents.add({
+      ents.upsert({
         id: entityId({ kind: 'waypoint', id: wp.id }),
         position: cart({ lat: wp.lat, lon: wp.lon, height }),
         point: {
@@ -510,7 +550,8 @@ export class MissionScene {
         label: label(String(i + 1), color),
       });
       // Stem down to the ground so heights are readable in 3D.
-      ents.add({
+      ents.upsert({
+        id: `stem:${wp.id}`,
         polyline: {
           positions: [
             cart({ lat: wp.lat, lon: wp.lon, height }),
@@ -528,7 +569,7 @@ export class MissionScene {
 
     for (const poi of mission.pois) {
       const selected = poi.id === opts.selectedId;
-      ents.add({
+      ents.upsert({
         id: entityId({ kind: 'poi', id: poi.id }),
         position: cart(poi),
         point: {
@@ -543,20 +584,27 @@ export class MissionScene {
     }
 
     if (path.length > 0) {
-      const samples = path.sampleByDistance(Math.max(1, path.length / 1500));
-      ents.add({
+      if (path !== this.renderedPath) {
+        this.renderedPath = path;
+        this.pathSamples = path.sampleByDistance(Math.max(1, path.length / 1500));
+        this.pathPositions = this.pathSamples.map((s) => cart(s.position));
+      }
+      const samples = this.pathSamples;
+      ents.upsert({
+        id: 'flight:path',
         polyline: {
-          positions: samples.map((s) => cart(s.position)),
+          positions: this.pathPositions,
           width: 6,
           material: new PolylineGlowMaterialProperty({ color: COLORS.path, glowPower: 0.2 }),
           arcType: ArcType.NONE,
         },
       });
-      for (const issue of opts.issues ?? []) {
+      for (const [index, issue] of (opts.issues ?? []).entries()) {
         if (issue.from === undefined || issue.to === undefined) continue;
         const span = samples.filter((s) => s.s >= issue.from! - 1 && s.s <= issue.to! + 1);
         if (span.length < 2) continue;
-        ents.add({
+        ents.upsert({
+          id: `flight:issue:${index}`,
           polyline: {
             positions: span.map((s) => cart(s.position)),
             width: 9,
@@ -566,7 +614,7 @@ export class MissionScene {
         });
       }
     }
-    ents.resumeEvents();
+    ents.finish();
 
     // Follow the selection (also when picked from a panel); takeoff and survey corners have no
     // selection of their own, so they keep the arrows until something else is clicked.
@@ -589,60 +637,78 @@ export class MissionScene {
    * under each obstacle's first point.
    */
   setObstacles(obstacles: Obstacle[], ground: (number | undefined)[]) {
-    const ents = this.obstacleLayer.entities;
-    ents.suspendEvents();
-    ents.removeAll();
+    const previous = this.obstacleSnapshot;
+    if (
+      previous &&
+      previous.obstacles.length === obstacles.length &&
+      obstacles.every(
+        (o, i) => o === previous.obstacles[i] && Object.is(ground[i], previous.ground[i]),
+      )
+    )
+      return;
+    this.obstacleSnapshot = { obstacles: [...obstacles], ground: [...ground] };
+    const ents = new EntityBatch(this.obstacleLayer.entities);
     obstacles.forEach((o, i) => {
       const base = ground[i] ?? 0;
       const [lon, lat] = o.coords[0]!;
       const name = o.name ?? OBSTACLE_LABELS[o.kind];
       if (isAirfield(o)) {
-        ents.add({
+        ents.upsert({
+          id: `obstacle:${i}:marker`,
           position: Cartesian3.fromDegrees(lon, lat, base),
           point: {
-            pixelSize: 9,
+            pixelSize: 14,
             color: COLORS.airfield,
-            outlineColor: Color.BLACK,
-            outlineWidth: 1,
+            outlineColor: Color.WHITE,
+            outlineWidth: 2,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
           },
-          label: { ...label(`✈ ${name}`, COLORS.airfield), scale: 0.85 },
+          label: hazardLabel(`AIRFIELD · ${name}`),
         });
         return;
       }
       const top = base + o.height;
       if (o.coords.length > 1) {
-        ents.add({
+        ents.upsert({
+          id: `obstacle:${i}:line`,
           polyline: {
             positions: o.coords.map(([x, y]) => Cartesian3.fromDegrees(x, y, top)),
-            width: 2,
-            material: COLORS.obstacle.withAlpha(0.8),
+            width: 5,
+            material: COLORS.obstacle,
+            depthFailMaterial: COLORS.obstacle.withAlpha(0.65),
             arcType: ArcType.NONE,
           },
         });
-        return;
-      }
-      ents.add({
-        polyline: {
-          positions: [
-            Cartesian3.fromDegrees(lon, lat, base),
-            Cartesian3.fromDegrees(lon, lat, top),
-          ],
-          width: 3,
-          material: COLORS.obstacle,
-          arcType: ArcType.NONE,
-        },
-      });
-      ents.add({
+      } else
+        ents.upsert({
+          id: `obstacle:${i}:line`,
+          polyline: {
+            positions: [
+              Cartesian3.fromDegrees(lon, lat, base),
+              Cartesian3.fromDegrees(lon, lat, top),
+            ],
+            width: 5,
+            material: COLORS.obstacle,
+            depthFailMaterial: COLORS.obstacle.withAlpha(0.65),
+            arcType: ArcType.NONE,
+          },
+        });
+      ents.upsert({
+        id: `obstacle:${i}:marker`,
         position: Cartesian3.fromDegrees(lon, lat, top),
-        point: { pixelSize: 6, color: COLORS.obstacle },
-        label: {
-          ...label(`${name} ${Math.round(o.height)} m`, COLORS.obstacle),
-          scale: 0.75,
-          distanceDisplayCondition: new DistanceDisplayCondition(0, 2500),
+        point: {
+          pixelSize: 12,
+          color: COLORS.obstacle,
+          outlineColor: Color.WHITE,
+          outlineWidth: 2,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
+        label: hazardLabel(
+          `HAZARD · ${name}\n${o.heightTagged ? '' : '~'}${Math.round(o.height)} m above ground`,
+        ),
       });
     });
-    ents.resumeEvents();
+    ents.finish();
     this.viewer.scene.requestRender();
   }
 
@@ -702,7 +768,11 @@ export class MissionScene {
    * Ellipsoid height of whatever lies beneath each position: the max of terrain, 3D tiles and
    * offline buildings, so buildings count as obstacles. Undefined where nothing could be sampled.
    */
-  async sampleGround(positions: { lat: number; lon: number }[]): Promise<(number | undefined)[]> {
+  async sampleGround(
+    positions: { lat: number; lon: number }[],
+    signal?: AbortSignal,
+  ): Promise<(number | undefined)[]> {
+    signal?.throwIfAborted();
     const { scene } = this.viewer;
     const carts = () => positions.map((p) => Cartographic.fromDegrees(p.lon, p.lat));
     let ground: (number | undefined)[] = positions.map(() => 0);
@@ -720,29 +790,51 @@ export class MissionScene {
     const max = (h: number | undefined, t: number | undefined) =>
       t === undefined || Number.isNaN(t) ? h : h === undefined ? t : Math.max(h, t);
 
+    signal?.throwIfAborted();
+
     const buildings = this.applied?.buildings;
     if (buildings) {
-      await buildings.ensure(positions);
+      await buildings.ensure(positions, signal);
+      signal?.throwIfAborted();
       ground = ground.map((h, i) =>
         max(h, buildings.heightAt(positions[i]!.lat, positions[i]!.lon)),
       );
     }
     const tilesets = this.applied?.tilesets ?? [];
     if (tilesets.length === 0 || !scene.sampleHeightSupported) return ground;
-    try {
-      const exclude = [
-        ...this.missionLayer.entities.values,
-        ...this.droneLayer.entities.values,
-        ...this.obstacleLayer.entities.values,
-      ];
-      const tiles = await scene.sampleHeightMostDetailed(carts(), exclude);
-      return ground.map((h, i) => max(h, tiles[i]?.height));
-    } catch {
-      return ground;
+    const exclude = [
+      ...this.missionLayer.entities.values,
+      ...this.droneLayer.entities.values,
+      ...this.obstacleLayer.entities.values,
+      ...this.gizmo.layer.entities.values,
+    ];
+    // Detailed height sampling performs GPU work. Hundreds of probes in a single call
+    // monopolize the main thread after a drop; bounded batches leave room for input.
+    const positionsToSample = carts();
+    for (let start = 0; start < positions.length; start += 4) {
+      signal?.throwIfAborted();
+      if (this.viewer.isDestroyed()) return ground;
+      try {
+        const tiles = await scene.sampleHeightMostDetailed(
+          positionsToSample.slice(start, start + 4),
+          exclude,
+        );
+        tiles.forEach((tile, i) => {
+          ground[start + i] = max(ground[start + i], tile?.height);
+        });
+      } catch {
+        // Keep the terrain/building result for batches that cannot be sampled.
+      }
+      await yieldToBrowser();
     }
+    signal?.throwIfAborted();
+    return ground;
   }
 
   destroy() {
+    this.viewer.scene.canvas.removeEventListener('pointerdown', this.onModifiedSelect, true);
+    this.removeDragUpdate();
+    this.pendingMove = undefined;
     this.handler.destroy();
     if (!this.viewer.isDestroyed()) this.viewer.destroy();
   }
@@ -751,14 +843,25 @@ export class MissionScene {
 function label(text: string, color: Color) {
   return {
     text,
-    font: '600 13px system-ui, sans-serif',
+    font: '600 15px system-ui, sans-serif',
     fillColor: color,
     outlineColor: Color.BLACK,
     outlineWidth: 3,
+    showBackground: true,
+    backgroundColor: Color.fromCssColorString('#0b1120').withAlpha(0.92),
+    backgroundPadding: new Cartesian2(7, 5),
     style: LabelStyle.FILL_AND_OUTLINE,
     verticalOrigin: VerticalOrigin.BOTTOM,
     horizontalOrigin: HorizontalOrigin.CENTER,
-    pixelOffset: new Cartesian2(0, -14),
+    pixelOffset: new Cartesian2(0, -20),
     disableDepthTestDistance: Number.POSITIVE_INFINITY,
+  };
+}
+
+function hazardLabel(text: string) {
+  return {
+    ...label(text, Color.WHITE),
+    font: '700 16px system-ui, sans-serif',
+    distanceDisplayCondition: new DistanceDisplayCondition(0, 10_000),
   };
 }

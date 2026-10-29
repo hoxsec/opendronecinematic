@@ -8,7 +8,7 @@ import {
 } from '@odc/core';
 import { useStore } from '../store';
 import { useCamera, usePath } from '../derived';
-import { Field, NumberInput, Section, Select } from './fields';
+import { Field, NumberInput, Section } from './fields';
 
 const HEADINGS: { value: HeadingMode; label: string }[] = [
   { value: 'auto', label: 'Along path' },
@@ -29,6 +29,7 @@ const altLabel = {
 export function WaypointPanel() {
   const mission = useStore((s) => s.mission);
   const selectedId = useStore((s) => s.selectedId);
+  const selectedIds = useStore((s) => s.selectedWaypointIds);
   const { select, removeWaypoint, moveWaypoint, setMode } = useStore.getState();
   const mode = useStore((s) => s.mode);
   const selected = mission.waypoints.find((w) => w.id === selectedId);
@@ -52,8 +53,8 @@ export function WaypointPanel() {
         {mission.waypoints.map((wp, i) => (
           <li
             key={wp.id}
-            className={wp.id === selectedId ? 'selected' : ''}
-            onClick={() => select(wp.id)}
+            className={selectedIds.includes(wp.id) ? 'selected' : ''}
+            onClick={(e) => select(wp.id, { toggle: e.ctrlKey || e.metaKey, range: e.shiftKey })}
           >
             <b>{i + 1}</b>
             <span>
@@ -81,53 +82,89 @@ export function WaypointPanel() {
           </li>
         ))}
       </ol>
-      {selected && <WaypointEditor wp={selected} index={mission.waypoints.indexOf(selected)} />}
+      {mission.waypoints.length > 1 && (
+        <p className="muted small">Ctrl-click to toggle · Shift-click to select a range</p>
+      )}
+      {selected && (
+        <WaypointEditor
+          wp={selected}
+          index={mission.waypoints.indexOf(selected)}
+          ids={selectedIds}
+        />
+      )}
     </Section>
   );
 }
 
-function WaypointEditor({ wp, index }: { wp: Waypoint; index: number }) {
+function WaypointEditor({ wp, index, ids }: { wp: Waypoint; index: number; ids: string[] }) {
   const mission = useStore((s) => s.mission);
-  const { updateWaypoint, setTime } = useStore.getState();
+  const { updateWaypoints, setTime } = useStore.getState();
+  const { profile } = useCamera();
+  const [minFocal, maxFocal] = focalRange(profile);
   const path = usePath();
-  const up = (patch: Partial<Waypoint>) => updateWaypoint(wp.id, patch);
-  const hover = wp.actions.find((a) => a.type === 'hover');
-  const has = (t: WaypointAction['type']) => wp.actions.some((a) => a.type === t);
+  const targets = mission.waypoints.filter((w) => ids.includes(w.id));
+  const bulk = targets.length > 1;
+  const common = <T,>(read: (w: Waypoint) => T): T | undefined => {
+    const value = read(targets[0] ?? wp);
+    return targets.every((w) => Object.is(read(w), value)) ? value : undefined;
+  };
+  const up = (patch: Partial<Waypoint>) => updateWaypoints(ids.length ? ids : [wp.id], patch);
+  const has = (t: WaypointAction['type']) =>
+    targets.every((w) => w.actions.some((a) => a.type === t));
+  const mixed = (t: WaypointAction['type']) =>
+    !has(t) && targets.some((w) => w.actions.some((a) => a.type === t));
   const toggle = (t: 'photo' | 'startRecording' | 'stopRecording') =>
-    up({ actions: has(t) ? wp.actions.filter((a) => a.type !== t) : [...wp.actions, { type: t }] });
+    updateWaypoints(ids, (w) => ({
+      actions: has(t)
+        ? w.actions.filter((a) => a.type !== t)
+        : [...w.actions.filter((a) => a.type !== t), { type: t }],
+    }));
   const setHover = (seconds: number) =>
-    up({
+    updateWaypoints(ids, (w) => ({
       actions: [
-        ...wp.actions.filter((a) => a.type !== 'hover'),
+        ...w.actions.filter((a) => a.type !== 'hover'),
         ...(seconds > 0 ? [{ type: 'hover' as const, seconds }] : []),
       ],
-    });
-  const interval = wp.actions.find((a) => a.type === 'photoDistance');
+    }));
   const setInterval = (meters: number) =>
-    up({
+    updateWaypoints(ids, (w) => ({
       actions: [
-        ...wp.actions.filter((a) => a.type !== 'photoDistance'),
+        ...w.actions.filter((a) => a.type !== 'photoDistance'),
         { type: 'photoDistance' as const, meters: Math.max(0, meters) },
       ],
-    });
-  const needsPoi = (wp.heading === 'poi' || wp.gimbal === 'poi') && mission.pois.length === 0;
+    }));
+  const needsPoi =
+    targets.some((w) => w.heading === 'poi' || w.gimbal === 'poi') && mission.pois.length === 0;
 
   return (
     <div className="editor">
       <header>
-        <h3>Waypoint {index + 1}</h3>
+        <h3>{bulk ? `${targets.length} waypoints selected` : `Waypoint ${index + 1}`}</h3>
         <button onClick={() => setTime(path.timings[index]?.arrive ?? 0)}>View camera</button>
       </header>
-      <p className="mono muted">
-        {wp.lat.toFixed(6)}, {wp.lon.toFixed(6)}
-      </p>
+      {bulk ? (
+        <p className="note">
+          Changes apply to all selected waypoints. “Mixed” means their values differ; untouched
+          settings are preserved.
+        </p>
+      ) : (
+        <p className="mono muted">
+          {wp.lat.toFixed(6)}, {wp.lon.toFixed(6)}
+        </p>
+      )}
       <div className="grid2">
         <Field label={altLabel[mission.altitudeMode]}>
-          <NumberInput value={wp.alt} suffix="m" onChange={(alt) => up({ alt })} />
+          <NumberInput
+            value={common((w) => w.alt)}
+            placeholder="Mixed"
+            suffix="m"
+            onChange={(alt) => up({ alt })}
+          />
         </Field>
         <Field label="Speed">
           <NumberInput
-            value={wp.speed ?? mission.settings.speed}
+            value={common((w) => w.speed ?? mission.settings.speed)}
+            placeholder="Mixed"
             step={0.5}
             min={0.5}
             suffix="m/s"
@@ -135,12 +172,25 @@ function WaypointEditor({ wp, index }: { wp: Waypoint; index: number }) {
           />
         </Field>
         <Field label="Heading">
-          <Select value={wp.heading} options={HEADINGS} onChange={(heading) => up({ heading })} />
+          <select
+            value={common((w) => w.heading) ?? ''}
+            onChange={(e) => up({ heading: e.target.value as HeadingMode })}
+          >
+            <option value="" disabled>
+              Mixed
+            </option>
+            {HEADINGS.map((h) => (
+              <option key={h.value} value={h.value}>
+                {h.label}
+              </option>
+            ))}
+          </select>
         </Field>
-        {wp.heading === 'fixed' ? (
+        {targets.some((w) => w.heading === 'fixed') ? (
           <Field label="Heading °">
             <NumberInput
-              value={wp.headingDeg ?? 0}
+              value={common((w) => w.headingDeg ?? 0)}
+              placeholder="Mixed"
               min={0}
               max={359}
               suffix="°"
@@ -151,12 +201,25 @@ function WaypointEditor({ wp, index }: { wp: Waypoint; index: number }) {
           <span />
         )}
         <Field label="Gimbal">
-          <Select value={wp.gimbal} options={GIMBALS} onChange={(gimbal) => up({ gimbal })} />
+          <select
+            value={common((w) => w.gimbal) ?? ''}
+            onChange={(e) => up({ gimbal: e.target.value as GimbalMode })}
+          >
+            <option value="" disabled>
+              Mixed
+            </option>
+            {GIMBALS.map((g) => (
+              <option key={g.value} value={g.value}>
+                {g.label}
+              </option>
+            ))}
+          </select>
         </Field>
-        {wp.gimbal === 'fixed' ? (
+        {targets.some((w) => w.gimbal === 'fixed') ? (
           <Field label="Pitch">
             <NumberInput
-              value={wp.gimbalPitch ?? mission.settings.gimbalPitch}
+              value={common((w) => w.gimbalPitch ?? mission.settings.gimbalPitch)}
+              placeholder="Mixed"
               min={-90}
               max={30}
               suffix="°"
@@ -167,25 +230,66 @@ function WaypointEditor({ wp, index }: { wp: Waypoint; index: number }) {
           <span />
         )}
       </div>
-      {(wp.heading === 'poi' || wp.gimbal === 'poi') && mission.pois.length > 0 && (
-        <Field label="POI">
-          <Select
-            value={wp.poiId ?? mission.pois[0]!.id}
-            options={mission.pois.map((p) => ({ value: p.id, label: p.name }))}
-            onChange={(poiId) => up({ poiId })}
-          />
-        </Field>
-      )}
+      {targets.some((w) => w.heading === 'poi' || w.gimbal === 'poi') &&
+        mission.pois.length > 0 && (
+          <Field label="POI">
+            <select
+              value={common((w) => w.poiId ?? mission.pois[0]!.id) ?? ''}
+              onChange={(e) => up({ poiId: e.target.value })}
+            >
+              <option value="" disabled>
+                Mixed
+              </option>
+              {mission.pois.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
       {needsPoi && (
         <p className="note">
           Add a POI for this waypoint to face; until then it behaves as “along path”.
         </p>
       )}
-      <ZoomEditor wp={wp} index={index} up={up} />
+      {bulk ? (
+        <>
+          <Field label="Zoom (35mm equivalent)">
+            <NumberInput
+              value={common((w) => w.focalMm ?? minFocal)}
+              placeholder="Mixed"
+              min={minFocal}
+              max={maxFocal}
+              suffix="mm"
+              onChange={(focalMm) =>
+                up({ focalMm: Math.max(minFocal, Math.min(maxFocal, focalMm)), zoomLock: false })
+              }
+            />
+          </Field>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={targets.every((w) => !!w.zoomLock)}
+              ref={(el) => {
+                if (el) el.indeterminate = common((w) => !!w.zoomLock) === undefined;
+              }}
+              onChange={(e) => up({ zoomLock: e.target.checked })}
+            />
+            Keep subject size (dolly zoom)
+          </label>
+        </>
+      ) : (
+        <ZoomEditor wp={wp} index={index} up={up} />
+      )}
       <div className="grid2">
         <Field label="Hover">
           <NumberInput
-            value={hover?.type === 'hover' ? hover.seconds : 0}
+            value={common((w) => {
+              const a = w.actions.find((a) => a.type === 'hover');
+              return a?.type === 'hover' ? a.seconds : 0;
+            })}
+            placeholder="Mixed"
             min={0}
             suffix="s"
             onChange={setHover}
@@ -196,7 +300,11 @@ function WaypointEditor({ wp, index }: { wp: Waypoint; index: number }) {
           hint="Take a photo every N metres from this waypoint on; 0 stops. Empty = keep the previous setting."
         >
           <NumberInput
-            value={interval?.type === 'photoDistance' ? interval.meters : undefined}
+            value={common((w) => {
+              const a = w.actions.find((a) => a.type === 'photoDistance');
+              return a?.type === 'photoDistance' ? a.meters : undefined;
+            })}
+            placeholder={bulk ? 'Mixed / unchanged' : undefined}
             min={0}
             suffix="m"
             onChange={setInterval}
@@ -208,6 +316,9 @@ function WaypointEditor({ wp, index }: { wp: Waypoint; index: number }) {
           <input
             type="checkbox"
             checked={has('startRecording')}
+            ref={(el) => {
+              if (el) el.indeterminate = mixed('startRecording');
+            }}
             onChange={() => toggle('startRecording')}
           />{' '}
           Start rec
@@ -216,12 +327,23 @@ function WaypointEditor({ wp, index }: { wp: Waypoint; index: number }) {
           <input
             type="checkbox"
             checked={has('stopRecording')}
+            ref={(el) => {
+              if (el) el.indeterminate = mixed('stopRecording');
+            }}
             onChange={() => toggle('stopRecording')}
           />{' '}
           Stop rec
         </label>
         <label>
-          <input type="checkbox" checked={has('photo')} onChange={() => toggle('photo')} /> Photo
+          <input
+            type="checkbox"
+            checked={has('photo')}
+            ref={(el) => {
+              if (el) el.indeterminate = mixed('photo');
+            }}
+            onChange={() => toggle('photo')}
+          />{' '}
+          Photo
         </label>
       </div>
     </div>
