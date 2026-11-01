@@ -34,6 +34,8 @@ No `WINDOWS_CERTIFICATE`, Apple account, PFX, P12, paid signing service or devel
 
 The existing `v*` workflow builds **draft** releases. The tag must match `apps/desktop/src-tauri/tauri.conf.json`'s version. `apps/desktop/scripts/prepare-release.mjs` writes an ignored `tauri.release.conf.json` override containing only public trust material and configuration. The private key stays in the CI environment.
 
+To rebuild an existing draft without moving its tag, run the **Release** workflow from `main` with `release_tag` set to that existing tag. The updated workflow checks out the tag's exact source and verifies its version before building. Leaving `release_tag` empty retains the cache-warming-only behavior. Rebuilds remain drafts; neither this input nor a tag push publishes a release. Cargo's `--locked` flag follows Tauri's `--` argument separator.
+
 When the keys are configured, Tauri signs the updater artifacts, and the action uploads the bundles, `.sig` files and `latest.json`. Windows updater metadata prefers NSIS. Universal macOS builds must have both architecture entries pointing to the universal archive. The feed is:
 
 ```text

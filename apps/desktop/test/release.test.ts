@@ -90,6 +90,15 @@ describe('updater-only release signing configuration', () => {
     );
     expect(workflow).toContain('secrets.TAURI_SIGNING_PRIVATE_KEY');
   });
+  it('uses supported action inputs and passes the lock flag to Cargo, not the Tauri CLI', () => {
+    const workflow = readFileSync('.github/workflows/release.yml', 'utf8');
+    expect(workflow).toContain('includeUpdaterJson:');
+    expect(workflow).not.toContain('uploadUpdaterJson:');
+    expect(workflow).toContain('--no-bundle -- --locked');
+    expect(workflow).toContain('--config src-tauri/tauri.release.conf.json -- --locked');
+    expect(workflow).toContain("format('refs/tags/{0}', inputs.release_tag)");
+    expect(workflow).toContain('Release tag must match the checked-out app version.');
+  });
   it('rejects mismatched release tags', () => {
     expect(prepare({ GITHUB_REF_TYPE: 'tag', GITHUB_REF_NAME: 'v0.0.0' }).error).toContain(
       'release tag',
