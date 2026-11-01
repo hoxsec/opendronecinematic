@@ -1,7 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { advancePlayback, rulerTicks, timeAtPointer } from '../src/timelineMath';
+import { advancePlayback, rulerTicks, timeAtPointer, timelineMarkers } from '../src/timelineMath';
 
 describe('custom timeline', () => {
+  it('keeps large mission markers readable and always includes the active waypoint', () => {
+    const timings = Array.from({ length: 2000 }, (_, i) => ({ arrive: i }));
+    for (const active of [0, 1, 1000, 1999]) {
+      const markers = timelineMarkers(timings, 1999, 600, active);
+      expect(markers).toContain(active);
+      expect(markers.length).toBeLessThanOrEqual(16);
+      expect(
+        markers.every(
+          (i, n) =>
+            n === 0 || ((timings[i]!.arrive - timings[markers[n - 1]!]!.arrive) / 1999) * 600 >= 40,
+        ),
+      ).toBe(true);
+    }
+    expect(timelineMarkers([], 0, 600)).toEqual([]);
+    expect(timelineMarkers([{ arrive: 0 }, { arrive: 0 }], 0, 600, 1)).toEqual([0, 1]);
+  });
   it('scrubs accurately and clamps drags outside the bar', () => {
     expect(timeAtPointer(150, 100, 200, 60)).toBe(15);
     expect(timeAtPointer(0, 100, 200, 60)).toBe(0);

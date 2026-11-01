@@ -7,6 +7,35 @@ const shapes = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  search: (
+    <>
+      <circle cx="10" cy="10" r="6" />
+      <path d="m15 15 6 6" />
+    </>
+  ),
+  chevron: <path d="m9 5 7 7-7 7" />,
+  grip: <path d="M9 5h.01M9 12h.01M9 19h.01M15 5h.01M15 12h.01M15 19h.01" />,
+  copy: (
+    <>
+      <rect x="8" y="8" width="12" height="13" rx="2" />
+      <path d="M16 8V3H3v13h5" />
+    </>
+  ),
+  trash: <path d="M3 6h18M9 6V3h6v3M5 6l1 15h12l1-15M10 10v7M14 10v7" />,
+  up: <path d="M12 20V4m-6 6 6-6 6 6" />,
+  down: <path d="M12 4v16m-6-6 6 6 6-6" />,
+  panelLeft: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M9 4v16" />
+    </>
+  ),
+  panelRight: (
+    <>
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <path d="M15 4v16" />
+    </>
+  ),
   folder: <path d="M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1l-2 11H3L1 8a1 1 0 0 1 1-1Z" />,
   save: (
     <>

@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { fmtTime, type Mission, type ZoomEvent } from '@odc/core';
 import { PLAYBACK_RATES, useStore } from '../store';
 import { usePath } from '../derived';
 import { useView } from '../viewStore';
 import { runAnalysis } from '../analysisWorker';
-import { advancePlayback, rulerTicks, timeAtPointer } from '../timelineMath';
+import { advancePlayback, rulerTicks, timeAtPointer, timelineMarkers } from '../timelineMath';
 
 export function Timeline({ onRender }: { onRender: () => void }) {
   const time = useStore((s) => s.time);
@@ -12,6 +12,8 @@ export function Timeline({ onRender }: { onRender: () => void }) {
   const rate = useStore((s) => s.playbackRate);
   const mission = useStore((s) => s.mission);
   const selectedIds = useStore((s) => s.selectedWaypointIds);
+  const selectedId = useStore((s) => s.selectedId);
+  const selection = useMemo(() => new Set(selectedIds), [selectedIds]);
   const rendering = useView((s) => !!s.render);
   const fly = useView((s) => s.fly);
   const { setTime, setPlaying, setPlaybackRate, select } = useStore.getState();
@@ -19,6 +21,16 @@ export function Timeline({ onRender }: { onRender: () => void }) {
   const duration = path.duration;
   const track = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
+  const markers = useMemo(
+    () =>
+      timelineMarkers(
+        path.timings,
+        duration,
+        width,
+        mission.waypoints.findIndex((w) => w.id === selectedId),
+      ),
+    [path, duration, width, mission.waypoints, selectedId],
+  );
   const [zoomResult, setZoomResult] = useState<{ mission: Mission; events: ZoomEvent[] }>();
   const zooms = zoomResult?.mission === mission ? zoomResult.events : [];
   const dragging = useRef<number | undefined>(undefined);
@@ -227,15 +239,16 @@ export function Timeline({ onRender }: { onRender: () => void }) {
           ))}
         </div>
         <div className="timeline-waypoints" aria-label="Waypoint markers">
-          {path.timings.map((tm, i) => {
+          {markers.map((i) => {
+            const tm = path.timings[i]!;
             const wp = mission.waypoints[i];
             return (
               <button
                 key={wp?.id ?? i}
-                className={`timeline-waypoint${wp && selectedIds.includes(wp.id) ? ' selected' : ''}`}
+                className={`timeline-waypoint${wp && selection.has(wp.id) ? ' selected' : ''}`}
                 style={{ left: pct(tm.arrive) }}
                 disabled={fly}
-                title={`Waypoint ${i + 1} · ${fmtTime(tm.arrive)} · Ctrl-click to toggle, Shift-click for range`}
+                title={`${wp?.name || `Waypoint ${i + 1}`} · ${fmtTime(tm.arrive)} · Ctrl/⌘-click to toggle, Shift-click for range`}
                 onClick={(e) => {
                   setPlaying(false);
                   setTime(tm.arrive);
@@ -248,6 +261,12 @@ export function Timeline({ onRender }: { onRender: () => void }) {
           })}
         </div>
       </div>
+      {markers.length < path.timings.length && (
+        <p className="timeline-density-hint">
+          Overview markers · select any of the {mission.waypoints.length.toLocaleString()} waypoints
+          in the outline
+        </p>
+      )}
     </div>
   );
 }

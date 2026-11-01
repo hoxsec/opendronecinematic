@@ -1,7 +1,7 @@
 {
   "name": "opendronecinematic",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.2.7",
   "description": "Open-source 3D drone flight planner for cinematic shots, waypoints and surveys, built on CesiumJS.",
   "license": "MIT",
   "type": "module",

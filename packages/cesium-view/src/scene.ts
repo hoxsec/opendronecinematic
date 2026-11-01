@@ -533,26 +533,36 @@ export class MissionScene {
       label: label('H', COLORS.takeoff),
     });
 
+    const selectedIds = new Set(opts.selectedIds);
+    const dense = mission.waypoints.length > 100;
     mission.waypoints.forEach((wp, i) => {
       const height = waypointHeight(mission, wp);
-      const selected = wp.id === opts.selectedId || opts.selectedIds?.includes(wp.id);
+      const selected = wp.id === opts.selectedId || selectedIds.has(wp.id);
       const color = selected ? COLORS.selected : COLORS.waypoint;
       ents.upsert({
         id: entityId({ kind: 'waypoint', id: wp.id }),
         position: cart({ lat: wp.lat, lon: wp.lon, height }),
         point: {
-          pixelSize: selected ? 16 : 12,
+          pixelSize: wp.id === opts.selectedId ? 16 : selected ? (dense ? 8 : 16) : dense ? 5 : 12,
           color,
           outlineColor: Color.BLACK,
-          outlineWidth: 2,
+          outlineWidth: dense && wp.id !== opts.selectedId ? 1 : 2,
           disableDepthTestDistance: Number.POSITIVE_INFINITY,
         },
-        label: label(String(i + 1), color),
+        label: {
+          ...label(
+            wp.id === opts.selectedId && wp.name ? `${i + 1} · ${wp.name}` : String(i + 1),
+            color,
+          ),
+          // Thousands of overlapping number badges obscure the route. Selection reveals its label.
+          show: !dense || wp.id === opts.selectedId,
+        },
       });
       // Stem down to the ground so heights are readable in 3D.
       ents.upsert({
         id: `stem:${wp.id}`,
         polyline: {
+          show: !dense || wp.id === opts.selectedId || (selected && selectedIds.size <= 20),
           positions: [
             cart({ lat: wp.lat, lon: wp.lon, height }),
             cart({ lat: wp.lat, lon: wp.lon, height: wp.groundHeight }),

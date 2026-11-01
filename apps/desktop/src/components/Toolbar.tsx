@@ -30,6 +30,8 @@ export function Toolbar({
   const layout = useView((s) => s.layout);
   const splitDir = useView((s) => s.splitDir);
   const rendering = useView((s) => !!s.render);
+  const outlineOpen = useView((s) => s.outlineOpen);
+  const inspectorOpen = useView((s) => s.inspectorOpen);
 
   const status =
     busy === 'saving'
@@ -121,6 +123,15 @@ export function Toolbar({
         </div>
       </div>
       <div className="tool-bar" aria-label="Planner tools">
+        <button
+          className="icon-button"
+          aria-label="Toggle flight outline"
+          title="Toggle flight outline"
+          aria-pressed={outlineOpen}
+          onClick={() => useView.getState().setOutlineOpen(!outlineOpen)}
+        >
+          <Icon name="panelLeft" size={17} />
+        </button>
         <div className="group tool-history">
           <button
             className="icon-button quiet"
@@ -207,6 +218,15 @@ export function Toolbar({
         <div className="spacer" />
         <div className="group">
           <ZoomMenu />
+          <button
+            className="icon-button"
+            aria-label="Toggle inspector"
+            title="Toggle inspector"
+            aria-pressed={inspectorOpen}
+            onClick={() => useView.getState().setInspectorOpen(!inspectorOpen)}
+          >
+            <Icon name="panelRight" size={17} />
+          </button>
           <button
             className="icon-button"
             onClick={focusMission}

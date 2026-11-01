@@ -14,7 +14,13 @@ export function createSampleProject() {
     sweep: 300,
     speed: 4,
   });
-  mission.waypoints = shot.waypoints;
+  const group = { id: newId('group'), name: 'Helix · Practice subject' };
+  mission.waypointGroups = [group];
+  mission.waypoints = shot.waypoints.map((w, i) => ({
+    ...w,
+    groupId: group.id,
+    name: i === 0 ? 'Opening frame' : i === shot.waypoints.length - 1 ? 'Final reveal' : undefined,
+  }));
   mission.pois = [shot.poi];
   return mission;
 }

@@ -74,6 +74,32 @@ describe('project file validation', () => {
       },
     ],
     ['invalid POIs', () => ({ ...makeMission(), pois: {} })],
+    ['invalid groups', () => ({ ...makeMission(), waypointGroups: [null] })],
+    ['empty group name', () => ({ ...makeMission(), waypointGroups: [{ id: 'g', name: ' ' }] })],
+    [
+      'duplicate groups',
+      () => ({
+        ...makeMission(),
+        waypointGroups: [
+          { id: 'g', name: 'A' },
+          { id: 'g', name: 'B' },
+        ],
+      }),
+    ],
+    [
+      'unknown group',
+      () => {
+        const m = makeMission();
+        return { ...m, waypoints: [{ ...m.waypoints[0], groupId: 'missing' }] };
+      },
+    ],
+    [
+      'invalid waypoint name',
+      () => {
+        const m = makeMission();
+        return { ...m, waypoints: [{ ...m.waypoints[0], name: 123 }] };
+      },
+    ],
     [
       'invalid settings',
       () => ({ ...makeMission(), settings: { ...DEFAULT_SETTINGS, speed: null } }),

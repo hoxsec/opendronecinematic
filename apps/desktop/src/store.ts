@@ -24,6 +24,7 @@ import {
   type DataSourceSettings,
 } from '@odc/cesium-view';
 import { loadDemFile } from './demStore';
+import { cleanWaypointGroups, reorderWaypoints } from './waypointOrganization';
 
 export type Mode = 'select' | 'addWaypoint' | 'addPoi' | 'setTakeoff' | 'drawSurvey';
 export interface SelectionModifiers {
@@ -75,6 +76,7 @@ interface State {
   undo(): void;
   redo(): void;
   select(id?: string, modifiers?: SelectionModifiers): void;
+  selectWaypoints(ids: string[]): void;
   setMode(mode: Mode): void;
   setTime(t: number): void;
   setPlaying(p: boolean): void;
@@ -97,6 +99,12 @@ interface State {
   removeWaypoint(id: string): void;
   removeWaypoints(ids: string[]): void;
   moveWaypoint(id: string, delta: -1 | 1): void;
+  reorderWaypoints(ids: string[], beforeId?: string, membership?: { groupId?: string }): void;
+  nudgeWaypoints(ids: string[], delta: -1 | 1): void;
+  duplicateWaypoints(ids: string[]): void;
+  groupWaypoints(ids: string[], name: string): void;
+  assignWaypointGroup(ids: string[], groupId?: string): void;
+  renameWaypointGroup(id: string, name: string): void;
   addPoiAt(pos: Geodetic): void;
   updatePoi(id: string, patch: Partial<PointOfInterest>, opts?: { history?: boolean }): void;
   removePoi(id: string): void;
@@ -112,20 +120,21 @@ function selectionAfterEdit(
   state: Pick<State, 'selectedId' | 'selectedWaypointIds' | 'selectionAnchor'>,
   mission: Mission,
 ) {
-  const ids = state.selectedWaypointIds.filter((id) => mission.waypoints.some((w) => w.id === id));
+  const available = new Set(mission.waypoints.map((w) => w.id));
+  const ids = state.selectedWaypointIds.filter((id) => available.has(id));
   const selectedId =
     state.selectedId &&
-    (mission.waypoints.some((w) => w.id === state.selectedId) ||
-      mission.pois.some((p) => p.id === state.selectedId))
+    (available.has(state.selectedId) || mission.pois.some((p) => p.id === state.selectedId))
       ? state.selectedId
       : ids.at(-1);
   return {
     selectedId,
     selectedWaypointIds:
       ids.length === state.selectedWaypointIds.length ? state.selectedWaypointIds : ids,
-    selectionAnchor: mission.waypoints.some((w) => w.id === state.selectionAnchor)
-      ? state.selectionAnchor
-      : ids.at(-1),
+    selectionAnchor:
+      state.selectionAnchor && available.has(state.selectionAnchor)
+        ? state.selectionAnchor
+        : ids.at(-1),
   };
 }
 
@@ -144,7 +153,7 @@ export const useStore = create<State>((set, get) => ({
 
   setMission(next, opts = {}) {
     const prev = get().mission;
-    const mission = typeof next === 'function' ? next(prev) : next;
+    const mission = cleanWaypointGroups(typeof next === 'function' ? next(prev) : next);
     if (mission === prev) return;
     set((s) => ({
       mission,
@@ -214,6 +223,18 @@ export const useStore = create<State>((set, get) => ({
       selectedId: ids.includes(id!) ? id : ids.at(-1),
       selectedWaypointIds: ids,
       selectionAnchor: modifiers.range && anchor >= 0 ? s.selectionAnchor : id,
+    });
+  },
+  selectWaypoints(ids) {
+    const wanted = new Set(ids);
+    const selectedWaypointIds = get()
+      .mission.waypoints.filter((w) => wanted.has(w.id))
+      .map((w) => w.id);
+    const active = get().selectedId;
+    set({
+      selectedWaypointIds,
+      selectedId: active && wanted.has(active) ? active : selectedWaypointIds[0],
+      selectionAnchor: selectedWaypointIds[0],
     });
   },
   setMode: (mode) => set({ mode }),
@@ -309,6 +330,73 @@ export const useStore = create<State>((set, get) => ({
       [wps[i], wps[j]] = [wps[j]!, wps[i]!];
       return { ...m, waypoints: wps };
     });
+  },
+  reorderWaypoints(ids, beforeId, membership) {
+    get().setMission((m) => reorderWaypoints(m, ids, beforeId, membership));
+  },
+  nudgeWaypoints(ids, delta) {
+    const selected = new Set(ids);
+    get().setMission((m) => {
+      const waypoints = [...m.waypoints];
+      let changed = false;
+      // Each selected run advances by one neighbour; selection order is retained.
+      for (
+        let i = delta < 0 ? 1 : waypoints.length - 2;
+        delta < 0 ? i < waypoints.length : i >= 0;
+        i -= delta
+      ) {
+        const j = i + delta;
+        if (selected.has(waypoints[i]!.id) && !selected.has(waypoints[j]!.id)) {
+          [waypoints[i], waypoints[j]] = [waypoints[j]!, waypoints[i]!];
+          changed = true;
+        }
+      }
+      return changed ? { ...m, waypoints } : m;
+    });
+  },
+  duplicateWaypoints(ids) {
+    const selected = new Set(ids);
+    const m = get().mission;
+    const copies = m.waypoints
+      .filter((w) => selected.has(w.id))
+      .map((w) => ({
+        ...w,
+        id: newId('wp'),
+        name: w.name ? `${w.name} copy` : undefined,
+        actions: w.actions.map((a) => ({ ...a })),
+      }));
+    if (!copies.length) return;
+    let last = -1;
+    m.waypoints.forEach((w, i) => {
+      if (selected.has(w.id)) last = i;
+    });
+    get().setMission({
+      ...m,
+      waypoints: [...m.waypoints.slice(0, last + 1), ...copies, ...m.waypoints.slice(last + 1)],
+    });
+    get().selectWaypoints(copies.map((w) => w.id));
+  },
+  groupWaypoints(ids, name) {
+    if (!name.trim()) return;
+    const selected = new Set(ids);
+    if (!get().mission.waypoints.some((w) => selected.has(w.id))) return;
+    const group = { id: newId('group'), name: name.trim() };
+    get().setMission((m) => ({
+      ...m,
+      waypointGroups: [...(m.waypointGroups ?? []), group],
+      waypoints: m.waypoints.map((w) => (selected.has(w.id) ? { ...w, groupId: group.id } : w)),
+    }));
+  },
+  assignWaypointGroup(ids, groupId) {
+    if (groupId && !get().mission.waypointGroups?.some((g) => g.id === groupId)) return;
+    get().updateWaypoints(ids, { groupId });
+  },
+  renameWaypointGroup(id, name) {
+    if (!name.trim()) return;
+    get().setMission((m) => ({
+      ...m,
+      waypointGroups: m.waypointGroups?.map((g) => (g.id === id ? { ...g, name: name.trim() } : g)),
+    }));
   },
   addPoiAt(pos) {
     const poi: PointOfInterest = {

@@ -24,6 +24,7 @@ export function useProjectLifecycle() {
 
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
       const state = useProject.getState();
       if (!state.active || !state.dirty || state.closeApproved) return;
       flushProjectRecovery();
@@ -34,6 +35,7 @@ export function useProjectLifecycle() {
       }
     };
     const pageHide = () => {
+      if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
       if (useProject.getState().active) flushProjectRecovery();
     };
     const visibility = () => {
@@ -51,6 +53,7 @@ export function useProjectLifecycle() {
           const stop = await getCurrentWindow().onCloseRequested((event) => {
             if (useProject.getState().closeApproved) return;
             event.preventDefault();
+            if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
             void useProject.getState().request({ kind: 'close' });
           });
           if (disposed) stop();

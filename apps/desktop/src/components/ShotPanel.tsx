@@ -4,6 +4,7 @@ import {
   defaultStartBearing,
   focalRange,
   generateShot,
+  newId,
   type ShotTemplate,
 } from '@odc/core';
 import { useStore } from '../store';
@@ -61,9 +62,12 @@ export function ShotPanel() {
         );
         return;
       }
+      const group = { id: newId('group'), name: `${info.name} · ${subject.name}` };
+      const grouped = waypoints.map((w) => ({ ...w, groupId: group.id }));
       st.setMission((m) => ({
         ...m,
-        waypoints: append ? [...m.waypoints, ...waypoints] : waypoints,
+        waypointGroups: append ? [...(m.waypointGroups ?? []), group] : [group],
+        waypoints: append ? [...m.waypoints, ...grouped] : grouped,
       }));
       st.setTime(0);
       st.notify(`${info.name}: ${waypoints.length} waypoints around ${subject.name}.`);

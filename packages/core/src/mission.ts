@@ -25,6 +25,9 @@ export type WaypointAction =
 
 export interface Waypoint {
   id: string;
+  /** Optional planner label; flight order is always the index in Mission.waypoints. */
+  name?: string;
+  groupId?: string;
   lat: number;
   lon: number;
   /** Altitude in metres, interpreted according to Mission.altitudeMode. */
@@ -97,6 +100,8 @@ export interface Mission {
   altitudeMode: AltitudeMode;
   takeoff: Takeoff;
   waypoints: Waypoint[];
+  /** Organizational metadata, saved in projects; groups never change export semantics. */
+  waypointGroups?: { id: string; name: string }[];
   pois: PointOfInterest[];
   settings: MissionSettings;
   /** Mapping area and grid parameters, when the mission is (or was generated as) a survey. */
@@ -249,6 +254,17 @@ export function parseMission(json: string): Mission {
     ids.add(id);
     return true;
   };
+  const groupIds = new Set<string>();
+  if (m.waypointGroups !== undefined) {
+    requireProject(Array.isArray(m.waypointGroups), 'waypoint groups');
+    for (const group of m.waypointGroups) {
+      requireProject(
+        record(group) && uniqueId(group.id) && typeof group.name === 'string' && group.name.trim(),
+        'waypoint group ID or name',
+      );
+      groupIds.add(group.id);
+    }
+  }
   for (const [i, w] of m.waypoints.entries()) {
     const label = `waypoint ${i + 1}`;
     requireProject(
@@ -266,6 +282,11 @@ export function parseMission(json: string): Mission {
       `${label} zoom lock`,
     );
     requireProject(w.poiId === undefined || typeof w.poiId === 'string', `${label} POI reference`);
+    requireProject(w.name === undefined || typeof w.name === 'string', `${label} name`);
+    requireProject(
+      w.groupId === undefined || (typeof w.groupId === 'string' && groupIds.has(w.groupId)),
+      `${label} group reference`,
+    );
     requireProject(Array.isArray(w.actions), `${label} actions`);
     for (const a of w.actions) {
       requireProject(record(a), `${label} action`);
