@@ -5,6 +5,7 @@ import { Toolbar } from './components/Toolbar';
 import { Workspace } from './components/Workspace';
 import { Timeline } from './components/Timeline';
 import { PlannerSidebar } from './components/PlannerSidebar';
+import { PlannerInspector } from './components/PlannerInspector';
 import { ProjectHome } from './components/ProjectHome';
 import { UnsavedDialog } from './components/UnsavedDialog';
 import { ExportDialog } from './components/ExportDialog';
@@ -18,6 +19,9 @@ import { useProjectLifecycle } from './useProjectLifecycle';
 export function App() {
   const [dialog, setDialog] = useState<'export' | 'settings' | 'render' | undefined>();
   const toast = useStore((s) => s.toast);
+  const missionId = useStore((s) => s.mission.id);
+  const outlineOpen = useView((s) => s.outlineOpen);
+  const inspectorOpen = useView((s) => s.inspectorOpen);
   const screen = useProject((s) => s.screen);
   const pendingAction = useProject((s) => s.pendingAction);
   const busy = useProject((s) => s.busy);
@@ -56,6 +60,8 @@ export function App() {
       if (mod && ['s', 'o', 'n'].includes(key)) {
         e.preventDefault();
         if (dialog || project.pendingAction || project.busy || useView.getState().render) return;
+        // Commit an in-progress name before saving or switching the project via keyboard.
+        if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
         if (key === 's') void project.save(e.shiftKey);
         else void project.request({ kind: key === 'o' ? 'open' : 'new' });
         return;
@@ -109,13 +115,16 @@ export function App() {
         {screen === 'home' ? (
           <ProjectHome onSettings={() => setDialog('settings')} />
         ) : (
-          <div className="app">
+          <div
+            className={`app${outlineOpen ? '' : ' outline-collapsed'}${inspectorOpen ? '' : ' inspector-collapsed'}`}
+          >
             <Toolbar
               onExport={() => setDialog('export')}
               onSettings={() => setDialog('settings')}
             />
-            <PlannerSidebar onSettings={() => setDialog('settings')} />
+            <PlannerSidebar key={missionId} />
             <Workspace />
+            <PlannerInspector key={`inspector:${missionId}`} />
             <Timeline onRender={() => setDialog('render')} />
           </div>
         )}

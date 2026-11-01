@@ -17,6 +17,49 @@ export function Field({
   );
 }
 
+/** Text edits are one undo step. Enter commits; Escape restores the saved value. */
+export function TextInput({
+  value,
+  onChange,
+  placeholder,
+  required = false,
+}: {
+  value: string;
+  onChange(value: string): void;
+  placeholder?: string;
+  required?: boolean;
+}) {
+  const [draft, setDraft] = useState(value);
+  useEffect(() => setDraft(value), [value]);
+  return (
+    <input
+      value={draft}
+      placeholder={placeholder}
+      maxLength={120}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={() => {
+        const next = draft.trim();
+        if (required && !next) {
+          setDraft(value);
+          return;
+        }
+        setDraft(next);
+        if (next !== value) onChange(next);
+      }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          e.currentTarget.blur();
+        }
+        if (e.key === 'Escape') {
+          e.stopPropagation();
+          setDraft(value);
+        }
+      }}
+    />
+  );
+}
+
 /**
  * A number input that only commits valid numbers, so typing "-" or "1." mid-edit doesn't
  * clobber the value. Commits on every valid keystroke so previews update live.

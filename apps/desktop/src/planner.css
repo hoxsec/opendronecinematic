@@ -1,0 +1,543 @@
+/* The planner uses three independent work areas; the map retains its WebGL contexts. */
+.app {
+  --outline-width: 316px;
+  --inspector-width: 320px;
+  grid-template-columns: var(--outline-width) minmax(0, 1fr) var(--inspector-width);
+  grid-template-areas:
+    'toolbar toolbar toolbar'
+    'sidebar main inspector'
+    'sidebar timeline inspector';
+}
+.app.outline-collapsed {
+  --outline-width: 0px;
+}
+.app.inspector-collapsed {
+  --inspector-width: 0px;
+}
+.main {
+  min-width: 0;
+}
+.planner-inspector {
+  grid-area: inspector;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+}
+.workspace-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 18px 16px 14px;
+  flex-shrink: 0;
+}
+.workspace-panel-header h2 {
+  margin: 0 0 3px;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.workspace-panel-header span {
+  font-size: 11px;
+  color: var(--muted);
+}
+.workspace-panel-header .icon-button {
+  color: var(--muted);
+}
+.flight-outline {
+  flex: 1;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.outline-summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 14px 12px 16px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.outline-summary > button {
+  margin-left: auto;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+.summary-dot {
+  padding: 0 2px;
+}
+.outline-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 14px 10px;
+  padding: 0 10px;
+  min-height: 36px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--bg);
+  color: var(--muted);
+}
+.outline-search:focus-within {
+  border-color: var(--accent);
+}
+.outline-search > svg {
+  flex-shrink: 0;
+}
+.outline-search input {
+  background: transparent;
+  border: 0;
+  padding: 8px 0;
+  font-size: 11px;
+}
+.outline-search .icon-button {
+  padding: 3px;
+}
+.outline-filter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px 10px 28px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.outline-filter select {
+  background: transparent;
+  border-color: transparent;
+  padding: 4px;
+  font-size: 11px;
+}
+.outline-filter > span {
+  margin-left: auto;
+}
+.outline-filter input,
+.outline-row > input {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  margin: 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.outline-scroll {
+  flex: 1;
+  min-height: 100px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  border-block: 1px solid var(--border);
+  background: #101620;
+}
+.outline-scroll:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: -2px;
+}
+.outline-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  left: 0;
+  right: 0;
+  padding: 4px 10px 4px 6px;
+  border-left: 2px solid transparent;
+  user-select: none;
+}
+.outline-row:hover {
+  background: #ffffff05;
+}
+.outline-row.selected {
+  background: #69dcc510;
+  border-left-color: var(--accent);
+}
+.outline-row .drag-handle {
+  display: flex;
+  color: #718198;
+  cursor: grab;
+  flex-shrink: 0;
+}
+.outline-row .drag-handle:active {
+  cursor: grabbing;
+}
+.outline-row-main {
+  flex: 1;
+  min-width: 0;
+  gap: 9px;
+  justify-content: flex-start;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 5px 2px;
+}
+.outline-row-main:focus-visible {
+  outline-offset: 0;
+}
+.outline-row-main > svg {
+  color: var(--muted);
+}
+.outline-row-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  flex: 1;
+}
+.outline-row-text strong {
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.outline-row-text small {
+  font-size: 10px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.waypoint-number {
+  min-width: 28px;
+  height: 25px;
+  display: grid;
+  place-items: center;
+  border: 1px solid #ffffff10;
+  border-radius: 5px;
+  color: #aab8ca;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+  background: #ffffff03;
+}
+.selected .waypoint-number {
+  color: var(--accent);
+  border-color: #69dcc533;
+  background: #69dcc508;
+}
+.outline-group {
+  background: #19212d;
+  border-top: 1px solid #ffffff07;
+}
+.outline-group .outline-row-main {
+  gap: 6px;
+}
+.outline-group .group-toggle:disabled {
+  opacity: 1;
+}
+.outline-group .outline-row-text strong {
+  font-weight: 600;
+}
+.group-chevron {
+  display: flex;
+  color: var(--muted);
+}
+.group-chevron.expanded {
+  transform: rotate(90deg);
+}
+.outline-row.drop-before::before,
+.outline-row.drop-after::after {
+  content: '';
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  height: 2px;
+  background: var(--accent);
+  z-index: 2;
+  pointer-events: none;
+}
+.outline-row.drop-before::before {
+  top: 0;
+}
+.outline-row.drop-after::after {
+  bottom: 0;
+}
+.outline-drop-end {
+  padding: 14px;
+  text-align: center;
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 11px;
+}
+.outline-drop-end.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.outline-selection {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  padding: 10px 14px 6px;
+  min-height: 36px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.outline-selection strong {
+  font-weight: 500;
+}
+.outline-selection button {
+  margin-left: auto;
+  padding: 0 4px;
+  font-size: 11px;
+}
+.outline-selection > span {
+  flex-basis: 100%;
+  margin-top: 4px;
+  color: #edc789;
+}
+.outline-actions {
+  display: flex;
+  gap: 5px;
+  padding: 0 14px;
+}
+.outline-actions button {
+  padding: 7px 8px;
+  font-size: 11px;
+}
+.outline-actions button:first-child {
+  flex: 1;
+}
+.delete-selection {
+  color: #f3abab;
+}
+.outline-help {
+  margin: 9px 14px 12px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+.outline-group-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px 14px 0;
+}
+.outline-group-form input {
+  flex-basis: 100%;
+  font-size: 12px;
+}
+.outline-group-form button {
+  padding: 5px 8px;
+  font-size: 11px;
+}
+.outline-reveal {
+  padding: 5px 14px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.outline-reveal button {
+  font-size: 11px;
+  padding: 3px;
+}
+.outline-empty,
+.inspector-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  padding: 40px 22px;
+  color: var(--muted);
+}
+.outline-empty strong,
+.inspector-empty h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+}
+.outline-empty p,
+.inspector-empty p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.outline-pois {
+  flex-shrink: 0;
+  border-top: 1px solid var(--border);
+  padding: 12px 14px;
+}
+.outline-pois summary {
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 500;
+}
+.outline-pois .count-badge {
+  margin-left: 5px;
+}
+.poi-list {
+  max-height: 124px;
+  overflow-y: auto;
+  margin-top: 8px;
+}
+.poi-list button {
+  display: flex;
+  justify-content: flex-start;
+  width: 100%;
+  border-color: transparent;
+  background: transparent;
+  font-size: 12px;
+}
+.poi-list button svg {
+  color: var(--poi);
+}
+.poi-list button.selected {
+  background: #69dcc510;
+  border-color: #69dcc533;
+}
+.poi-add {
+  margin-top: 5px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.flight-sidebar .project-warning {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 0;
+  font-size: 11px;
+  max-height: 90px;
+  overflow: auto;
+}
+.inspector-tabs {
+  padding: 0 8px;
+  background: transparent;
+}
+.inspector-tabs button {
+  font-size: 11px;
+  padding: 11px 4px;
+}
+.inspector-content {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.waypoint-inspector {
+  border-radius: 0;
+  background: transparent;
+  padding: 18px;
+  gap: 12px;
+}
+.waypoint-inspector > h3,
+.poi-inspector > h3 {
+  font-size: 17px;
+  line-height: 1.4;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+.waypoint-inspector .field > span,
+.planner-inspector .panel .field > span {
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+.waypoint-inspector .field input,
+.waypoint-inspector .field select {
+  min-height: 34px;
+  font-size: 12px;
+}
+.inspector-locate button {
+  flex: 1;
+  font-size: 11px;
+  padding-block: 7px;
+}
+.selection-note {
+  margin: 0;
+  padding: 10px;
+  border-radius: 6px;
+  background: #69dcc508;
+  border: 1px solid #69dcc520;
+  color: #b6c9c6;
+  font-size: 11px;
+  line-height: 1.65;
+}
+.inspector-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+.inspector-section summary {
+  font-weight: 500;
+  font-size: 12px;
+  cursor: pointer;
+  color: #cbd5e1;
+}
+.inspector-section > :not(summary) {
+  margin-top: 12px;
+}
+.inspector-section .check {
+  font-size: 11px;
+}
+.inspector-section .chips {
+  font-size: 11px;
+  gap: 8px;
+}
+.planner-inspector .panel {
+  padding: 18px;
+  gap: 12px;
+}
+.timeline {
+  gap: 8px;
+  padding: 10px 16px;
+}
+.timeline-controls {
+  gap: 8px 10px;
+}
+.timeline .mono {
+  font-size: 12px;
+}
+.timeline-time {
+  min-width: 105px;
+}
+.playback-rate {
+  font-size: 11px;
+}
+.timeline-controls > button {
+  font-size: 11px;
+}
+.timeline-ruler > span {
+  font-size: 10px;
+}
+.timeline-progress {
+  background: linear-gradient(90deg, #69dcc51a, #69dcc54a);
+}
+.timeline-density-hint {
+  color: var(--muted);
+  font-size: 10px;
+  margin: 0;
+}
+@media (max-width: 1200px) {
+  .app {
+    --outline-width: 280px;
+    --inspector-width: 292px;
+  }
+  .tool-bar {
+    gap: 4px;
+    padding-inline: 8px;
+  }
+  .tool-bar button {
+    gap: 5px;
+    padding-inline: 7px;
+    font-size: 11px;
+  }
+  .outline-actions {
+    gap: 3px;
+  }
+  .outline-actions button {
+    padding-inline: 7px;
+  }
+}
+@media (max-height: 720px) {
+  .workspace-panel-header {
+    padding-block: 12px 8px;
+  }
+  .outline-pois {
+    padding-block: 8px;
+  }
+  .poi-list {
+    max-height: 64px;
+  }
+  .outline-help {
+    margin-block: 6px;
+  }
+}

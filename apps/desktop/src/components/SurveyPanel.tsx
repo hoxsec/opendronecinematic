@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DEFAULT_SURVEY,
   bestSurveyAngle,
   haversine,
   missionProfile,
+  newId,
   planSurvey,
   surveyWaypoints,
   type SurveySpec,
@@ -25,7 +26,10 @@ export function SurveyPanel() {
   const spec: SurveySpec = { ...DEFAULT_SURVEY, polygon: [], ...survey };
   const up = (patch: Partial<SurveySpec>) => updateSurvey(patch);
   const ready = spec.polygon.length >= 3;
-  const plan = ready ? planSurvey(missionProfile(mission), spec) : undefined;
+  const plan = useMemo(
+    () => (ready ? planSurvey(missionProfile(mission), spec) : undefined),
+    [mission],
+  );
   const speed = spec.speed ?? mission.settings.speed;
   const photoSeconds = plan ? plan.stats.triggerDistance / speed : Infinity;
 
@@ -49,9 +53,11 @@ export function SurveyPanel() {
         );
         return;
       }
+      const group = { id: newId('group'), name: 'Survey grid' };
       st.setMission({
         ...m,
-        waypoints,
+        waypoints: waypoints.map((w) => ({ ...w, groupId: group.id })),
+        waypointGroups: [group],
         settings: { ...m.settings, pathMode: 'straight' },
       });
       st.setMode('select');

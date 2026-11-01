@@ -71,6 +71,8 @@ export interface FrameGuides {
 }
 
 interface LayoutPrefs {
+  outlineOpen: boolean;
+  inspectorOpen: boolean;
   main: MainView;
   mini: MiniRect;
   layout: Layout;
@@ -85,6 +87,8 @@ interface LayoutPrefs {
 
 const LAYOUT_KEY = 'odc.layout.v1';
 const DEFAULT_LAYOUT: LayoutPrefs = {
+  outlineOpen: true,
+  inspectorOpen: true,
   main: 'map',
   mini: { right: 12, bottom: 12, width: 480 },
   layout: 'pip',
@@ -115,6 +119,8 @@ interface ViewState extends LayoutPrefs {
   compare: boolean;
 
   swap(): void;
+  setOutlineOpen(open: boolean): void;
+  setInspectorOpen(open: boolean): void;
   setMain(main: MainView): void;
   setMini(mini: MiniRect): void;
   setLayout(layout: Layout): void;
@@ -139,6 +145,8 @@ export const useView = create<ViewState>((set, get) => ({
   compare: false,
 
   swap: () => get().setMain(get().main === 'map' ? 'camera' : 'map'),
+  setOutlineOpen: (outlineOpen) => set({ outlineOpen }),
+  setInspectorOpen: (inspectorOpen) => set({ inspectorOpen }),
   setMain: (main) => set({ main }),
   setMini: (mini) => set({ mini }),
   setLayout: (layout) => set({ layout }),

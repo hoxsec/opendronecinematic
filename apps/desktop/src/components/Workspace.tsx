@@ -1,4 +1,10 @@
-import { useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
 import { useStore } from '../store';
 import { useView, type MainView } from '../viewStore';
 import { useCamera } from '../derived';
@@ -26,6 +32,14 @@ const DIVIDER = 6;
  */
 export function Workspace() {
   const areaRef = useRef<HTMLDivElement>(null);
+  const [bounds, setBounds] = useState({ width: 800, height: 600 });
+  useEffect(() => {
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry) setBounds({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    if (areaRef.current) observer.observe(areaRef.current);
+    return () => observer.disconnect();
+  }, []);
   const main = useView((s) => s.main);
   const mini = useView((s) => s.mini);
   const layout = useView((s) => s.layout);
@@ -38,11 +52,16 @@ export function Workspace() {
 
   const miniKind: MainView = main === 'map' ? 'camera' : 'map';
   const aspect = miniKind === 'camera' ? profile.videoAspect : MAP_MINI_ASPECT;
+  const miniWidth = Math.min(
+    mini.width,
+    Math.max(160, bounds.width * 0.6),
+    Math.max(160, bounds.height * aspect * 0.6),
+  );
   const miniStyle: CSSProperties = {
-    right: mini.right,
-    bottom: mini.bottom,
-    width: mini.width,
-    height: mini.width / aspect,
+    right: Math.max(0, Math.min(mini.right, bounds.width - miniWidth)),
+    bottom: Math.max(0, Math.min(mini.bottom, bounds.height - miniWidth / aspect)),
+    width: miniWidth,
+    height: miniWidth / aspect,
   };
 
   /** Shared pointer-drag helper that clamps the mini-screen inside the main area. */
@@ -50,7 +69,13 @@ export function Workspace() {
     e.preventDefault();
     e.stopPropagation();
     const area = areaRef.current!.getBoundingClientRect();
-    const start = { x: e.clientX, y: e.clientY, ...useView.getState().mini };
+    const start = {
+      x: e.clientX,
+      y: e.clientY,
+      right: miniStyle.right as number,
+      bottom: miniStyle.bottom as number,
+      width: miniWidth,
+    };
     const move = (m: PointerEvent) => {
       const dx = m.clientX - start.x;
       const dy = m.clientY - start.y;

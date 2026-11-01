@@ -17,3 +17,29 @@ export function rulerTicks(duration: number, count: number) {
   ticks.push(duration);
   return ticks;
 }
+
+/** Bound marker DOM and prevent overlapping labels, retaining the active waypoint at any scale. */
+export function timelineMarkers(
+  timings: readonly { arrive: number }[],
+  duration: number,
+  width: number,
+  active = -1,
+) {
+  const activeX =
+    active >= 0 && timings[active] && duration > 0
+      ? (timings[active]!.arrive / duration) * width
+      : undefined;
+  const indices: number[] = [];
+  let lastX = -Infinity;
+  for (let i = 0; i < timings.length; i++) {
+    const x = duration > 0 ? (timings[i]!.arrive / duration) * width : 0;
+    if (
+      i === active ||
+      (x - lastX >= 40 && (activeX === undefined || Math.abs(x - activeX) >= 40))
+    ) {
+      indices.push(i);
+      lastX = x;
+    }
+  }
+  return indices;
+}

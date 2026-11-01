@@ -7,7 +7,7 @@ import {
 } from '@odc/core';
 import { useStore } from '../store';
 import { useCamera, usePath } from '../derived';
-import { Field, NumberInput, Section, Select } from './fields';
+import { Field, NumberInput, Section, Select, TextInput } from './fields';
 
 const ALT_MODES: { value: AltitudeMode; label: string }[] = [
   { value: 'relativeToTakeoff', label: 'Relative to takeoff' },
@@ -26,10 +26,7 @@ export function MissionPanel() {
   return (
     <Section title="Mission">
       <Field label="Name">
-        <input
-          value={mission.name}
-          onChange={(e) => setMission((m) => ({ ...m, name: e.target.value }), { history: false })}
-        />
+        <TextInput value={mission.name} onChange={(name) => setMission((m) => ({ ...m, name }))} />
       </Field>
       <Field label="Drone">
         <select
