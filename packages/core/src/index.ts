@@ -11,3 +11,4 @@ export * from './track';
 export * from './survey';
 export * from './dem';
 export * from './sun';
+export * from './airspace';

@@ -56,6 +56,7 @@
 | 🎬 **Shot templates**          | Orbit, helix, reveal, dolly, fly-by and dronie, generated around a subject in one click.                                                 |
 | 🗺️ **Survey grids**            | Draw an area, set height and overlap, get a lawnmower grid with GSD, photo count and distance-triggered photos.                          |
 | 🛡️ **Safety checks**           | Terrain and building clearance, 120 m ceiling, range, speed, climb rate and battery.                                                     |
+| 🗺️ **Airspace overlays**       | Import local GeoJSON footprints, see potential route crossings, and keep source/freshness limits explicit. No live regulatory feed.      |
 | 📤 **Export to your drone**    | Litchi CSV, DJI WPML/KMZ, QGroundControl `.plan` and Mission Planner, with an option to match the preview.                               |
 | 📥 **Import missions**         | Open Litchi CSV, DJI KMZ, QGC `.plan` and Mission Planner files to preview, edit and re-export them.                                     |
 | ⛰️ **GeoTIFF terrain**         | Load your own elevation model (SRTM, Copernicus, lidar) for offline terrain, safety checks and terrain following.                        |
@@ -272,7 +273,7 @@ Distance-triggered photos export as Litchi `photo_distinterval`, DJI WPML `multi
 </table>
 
 > [!NOTE]
-> Clearance checks need real terrain, so add a free Cesium ion token (see [Map data](#map-data)). Airspace restrictions are **not** checked yet.
+> Clearance checks need real terrain, so add a free Cesium ion token (see [Map data](#map-data)). **Safety → Airspace overlays** can import local GeoJSON for horizontal footprint warnings. No authoritative coverage or live NOTAM feed is included; altitude limits and activation are not evaluated. Always check official sources. See [Airspace overlays](docs/airspace.md).
 
 ### 8. Export to your drone
 
@@ -359,7 +360,9 @@ Only successful full binary responses with explicit, readable HTTP freshness inf
 
 ### Download
 
-Installers for Windows (`.exe`, `.msi`), macOS (`.dmg`) and Linux (`.AppImage`, `.deb`) are attached to each [GitHub Release](../../releases). The **Release** workflow builds them whenever a `v*` tag is pushed. The app isn't code-signed yet, so Windows SmartScreen may ask you to confirm with **More info → Run anyway**.
+Installers for Windows (`.exe`, `.msi`), macOS (`.dmg`) and Linux (`.AppImage`, `.deb`) are attached to each [GitHub Release](../../releases). The **Release** workflow builds them whenever a `v*` tag is pushed. Installers are not signed by a trusted publisher; Windows SmartScreen, macOS Gatekeeper or organizational policy may warn or block installation.
+
+M3 adds **Map data → Updates** for configured, signature-verified desktop builds. Only a free updater key pair is needed—Windows publisher certificates and Apple notarization are not required or configured. macOS bundles use ad-hoc signing; OS trust warnings may remain. Unconfigured builds use manual installers. See [Updater setup](docs/releases.md).
 
 ### Build from source
 
@@ -436,7 +439,7 @@ If you change an exporter on purpose, update its golden files with `npx vitest r
 
 - [x] **M1: cinematic planning.** Waypoints, POIs, camera preview, templates, safety, Litchi and DJI export, fly mode, video renders
 - [x] **M2: mapping and more drones.** Survey grids (polygon, overlap, GSD), QGroundControl `.plan` / MAVLink export, GeoTIFF terrain, importing KMZ, Litchi and `.plan` files
-- [ ] **M3: polish.** Airspace overlays, signed installers with auto-update, a plugin API for exporters
+- [ ] **M3: polish (in progress).** Local airspace overlays, signature-verified updates (without paid OS signing), and an [exporter plugin API](docs/exporter-plugins.md). See [M3 status and remaining release gates](docs/m3.md).
 
 ## 🤝 Contributing
 

@@ -32,8 +32,9 @@ import {
   type LocalRegion,
 } from '../localData';
 import { Field, NumberInput, Select } from './fields';
+import { UpdatesTab } from './UpdatesTab';
 
-type Tab = 'sources' | 'offline' | 'keys' | 'cache';
+type Tab = 'sources' | 'offline' | 'keys' | 'cache' | 'updates';
 
 const NEEDS: Record<Requirement, string> = {
   ion: 'a Cesium ion token',
@@ -86,6 +87,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
               ['offline', 'Offline countries'],
               ['keys', 'Tokens & keys'],
               ['cache', 'Tile cache'],
+              ['updates', 'Updates'],
             ] as const
           ).map(([t, label]) => (
             <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)}>
@@ -98,6 +100,7 @@ export function SettingsDialog({ onClose }: { onClose: () => void }) {
         {tab === 'offline' && <OfflineTab draft={draft} up={up} />}
         {tab === 'keys' && <KeysTab draft={draft} up={up} />}
         {tab === 'cache' && <TileCacheTab />}
+        {tab === 'updates' && <UpdatesTab />}
 
         <div className="button-row end">
           <button onClick={onClose}>Cancel</button>

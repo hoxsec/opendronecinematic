@@ -69,7 +69,7 @@ export function SafetyPanel() {
         )}
       </div>
       {safety.issues.length === 0 ? (
-        <p className="ok">No issues found.</p>
+        <p className="ok">No terrain, performance or battery issues found.</p>
       ) : (
         <ul className="issues">
           {safety.issues.map((i, k) => (

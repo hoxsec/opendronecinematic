@@ -39,7 +39,14 @@
 
 ## Adding an exporter
 
-1. Create `packages/exporters/src/<format>.ts` that takes `toExportPoints(mission, opts)` and returns `{ data, warnings }`.
-2. Add golden-file tests in `packages/exporters/test`.
-3. Add the format to `ExportDialog.tsx` and to the profiles' `exportFormats`.
-4. Document the mapping in `docs/exports.md`.
+1. Implement an `ExporterPlugin` v1 using `toExportPoints(mission, opts)` and returning `{ data, warnings }`.
+2. Register the reviewed static import in `apps/desktop/src/exportPlugins.ts`; the dialog discovers metadata and option controls automatically.
+3. Add golden-file/unit tests in `packages/exporters/test` and document the mapping in `docs/exports.md`.
+
+See [Exporter plugin API](exporter-plugins.md). Registries are host-owned; extensions receive deep-copied missions, and obsolete async previews cannot be saved. This is not a runtime code loader or security sandbox.
+
+## Airspace and updates
+
+`core/airspace.ts` validates bounded WGS84 GeoJSON and checks horizontal polygon/segment intersections, including holes and antimeridian-local geometry. The app persists one local layer separately from projects. A cancellable analysis worker recomputes crossings after mission edits; map visibility does not disable checks. Cesium draws ground footprints, not altitude volumes. See [Airspace limits](airspace.md).
+
+The desktop updater reads its trust key/feed from native build configuration, not projects or frontend preferences. It verifies downloads using Tauri, checks saved-work/render/fly-mode readiness before and after downloading, and locks the UI while installing. Base builds have no key/feed and perform no update network requests. The release workflow generates a public-only configuration override from a maintainer-provisioned updater key; Windows publisher signing and Apple notarization are not required or configured. See [Updater setup](releases.md).

@@ -15,6 +15,10 @@
     "fs:allow-read-file",
     "fs:allow-read-text-file",
     "fs:allow-write-file",
-    "fs:allow-write-text-file"
+    "fs:allow-write-text-file",
+    "updater:allow-check",
+    "updater:allow-download",
+    "updater:allow-install",
+    "process:allow-restart"
   ]
 }

@@ -8,6 +8,7 @@ import { ShotPanel } from './ShotPanel';
 import { SurveyPanel } from './SurveyPanel';
 import { SunPanel } from './SunPanel';
 import { SafetyPanel } from './SafetyPanel';
+import { AirspacePanel } from './AirspacePanel';
 import { Icon } from './Icon';
 
 const TABS = [
@@ -144,6 +145,7 @@ export function PlannerInspector() {
           hidden={tab !== 'safety'}
         >
           <SafetyPanel />
+          <AirspacePanel />
         </div>
       </div>
     </aside>

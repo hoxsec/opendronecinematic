@@ -27,7 +27,7 @@ npm run format:check
 - **Verified DJI enum values** (`droneEnumValue` / `payloadEnumValue`) for consumer drones. Take them from a KMZ that DJI Fly or Pilot 2 created, and say which app and firmware version produced it.
 - **Flight test reports**: export → app → real flight, plus whether the path and camera matched the preview.
 - **New drone profiles** with a source for each spec.
-- **Exporters**: QGroundControl `.plan`, Mission Planner, Autel, Skydio.
+- **Exporters**: Autel, Skydio and other formats through the [exporter plugin API](docs/exporter-plugins.md). QGroundControl and Mission Planner are already built in.
 
 ## Safety
 

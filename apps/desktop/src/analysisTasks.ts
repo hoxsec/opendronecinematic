@@ -3,17 +3,22 @@ import {
   evaluateSafety,
   missionProfile,
   zoomEvents,
+  checkAirspace,
+  type AirspaceZone,
   type Mission,
   type Obstacle,
 } from '@odc/core';
 
 export type AnalysisRequest =
   | { kind: 'zoom'; mission: Mission }
+  | { kind: 'airspace'; mission: Mission; zones: AirspaceZone[] }
   | { kind: 'safety'; mission: Mission; ground: (number | undefined)[]; obstacles: Obstacle[] };
 
 /** CPU-heavy derived data runs in a worker, never in a React render or a mouse handler. */
 export function analyzeMission(request: AnalysisRequest) {
   const path = buildFlightPath(request.mission);
+  if (request.kind === 'airspace')
+    return { kind: 'airspace' as const, conflicts: checkAirspace(path, request.zones) };
   if (request.kind === 'zoom')
     return { kind: 'zoom' as const, events: zoomEvents(path, missionProfile(request.mission)) };
   const samples = path.sampleByDistance(Math.max(5, path.length / 400));

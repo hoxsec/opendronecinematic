@@ -2150,3 +2150,50 @@ button.large {
     animation-duration: 2s;
   }
 }
+/* Airspace footprints use the same categories and colors in the map and inspector. */
+.airspace-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0;
+  font-size: 11px;
+}
+.airspace-legend span::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 5px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.airspace-legend .restricted {
+  color: #f87171;
+}
+.airspace-legend .controlled {
+  color: #a78bfa;
+}
+.airspace-legend .advisory {
+  color: #fbbf24;
+}
+.export-options {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.update-notes {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 180px;
+  overflow: auto;
+  font: inherit;
+}
+.update-installing {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+  background: #0d1118f5;
+}

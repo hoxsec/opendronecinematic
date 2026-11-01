@@ -19,6 +19,7 @@ import { getPath, useCamera, usePath, useSunTime } from '../derived';
 import { useView } from '../viewStore';
 import { runAnalysis } from '../analysisWorker';
 import { setActiveScene } from '../sceneAccess';
+import { useAirspace } from '../airspaceStore';
 
 /** Exposed so other panels (shot templates) can sample ground heights. */
 export { activeScene } from '../sceneAccess';
@@ -40,6 +41,7 @@ export function GlobeView() {
   const zoom = useView((s) => s.zoom);
   const sunTime = useSunTime().getTime();
   const path = usePath();
+  const airspace = useAirspace((s) => s.layer);
   const { fov, profile } = useCamera();
 
   useEffect(() => {
@@ -87,6 +89,10 @@ export function GlobeView() {
   useEffect(() => {
     sceneRef.current?.setZoom(zoom.speed, zoom.snappy);
   }, [zoom]);
+
+  useEffect(() => {
+    sceneRef.current?.setAirspace(airspace?.data.zones ?? [], airspace?.visible ?? false);
+  }, [airspace]);
 
   useEffect(() => {
     sceneRef.current?.setSun(new Date(sunTime));

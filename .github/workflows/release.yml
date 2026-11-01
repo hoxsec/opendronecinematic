@@ -22,6 +22,11 @@ jobs:
           - os: macos-latest
             args: '--target universal-apple-darwin'
     runs-on: ${{ matrix.os }}
+    env:
+      ODC_UPDATER_PUBLIC_KEY: ${{ vars.ODC_UPDATER_PUBLIC_KEY }}
+      ODC_REQUIRE_SIGNING: ${{ vars.ODC_REQUIRE_SIGNING }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -41,6 +46,10 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
       - run: npm ci
+      - name: Prepare signed updater configuration
+        id: signing
+        if: github.event_name == 'push'
+        run: node apps/desktop/scripts/prepare-release.mjs
       - name: Warm release build cache without publishing
         if: github.event_name == 'workflow_dispatch'
         uses: tauri-apps/tauri-action@v0
@@ -56,4 +65,7 @@ jobs:
           tagName: ${{ github.ref_name }}
           releaseName: OpenDroneCinematic ${{ github.ref_name }}
           releaseDraft: true
-          args: ${{ matrix.args }} --locked
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          uploadUpdaterJson: ${{ steps.signing.outputs.updater-enabled == 'true' }}
+          updaterJsonPreferNsis: true
+          args: ${{ matrix.args }} --locked --config src-tauri/tauri.release.conf.json

@@ -10,3 +10,4 @@ apps/desktop/src-tauri/gen/
 .env.local
 .claude/
 .playwright-mcp/
+apps/desktop/src-tauri/tauri.release.conf.json

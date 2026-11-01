@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { isTauri } from './platform';
 import { flushProjectRecovery, useProject } from './projectStore';
 import { useStore } from './store';
+import { useUpdates } from './updateStore';
 
 export function useProjectLifecycle() {
   const active = useProject((s) => s.active);
@@ -51,6 +52,10 @@ export function useProjectLifecycle() {
       void import('@tauri-apps/api/window')
         .then(async ({ getCurrentWindow }) => {
           const stop = await getCurrentWindow().onCloseRequested((event) => {
+            if (useUpdates.getState().phase === 'installing') {
+              event.preventDefault();
+              return;
+            }
             if (useProject.getState().closeApproved) return;
             event.preventDefault();
             if (document.activeElement instanceof HTMLElement) document.activeElement.blur();

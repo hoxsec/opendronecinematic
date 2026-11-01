@@ -6,6 +6,8 @@ import {
   evaluateSafety,
   missionProfile,
   zoomEvents,
+  checkAirspace,
+  parseAirspaceGeoJson,
 } from '@odc/core';
 import { analyzeMission } from '../src/analysisTasks';
 
@@ -34,5 +36,37 @@ describe('background analysis', () => {
       kind: 'zoom',
       events: zoomEvents(buildFlightPath(mission), missionProfile(mission)),
     });
+  });
+
+  it('checks airspace off the UI thread with the same preview path', () => {
+    const zones = parseAirspaceGeoJson(
+      JSON.stringify({
+        type: 'FeatureCollection',
+        features: [
+          {
+            type: 'Feature',
+            properties: {},
+            geometry: {
+              type: 'Polygon',
+              coordinates: [
+                [
+                  [6.99, 45.99],
+                  [7.01, 45.99],
+                  [7.01, 46.01],
+                  [6.99, 46.01],
+                  [6.99, 45.99],
+                ],
+              ],
+            },
+          },
+        ],
+      }),
+    ).zones;
+    const result = analyzeMission({ kind: 'airspace', mission, zones });
+    expect(result).toEqual({
+      kind: 'airspace',
+      conflicts: checkAirspace(buildFlightPath(mission), zones),
+    });
+    if (result.kind === 'airspace') expect(result.conflicts).toHaveLength(1);
   });
 });

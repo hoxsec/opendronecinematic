@@ -52,6 +52,8 @@ import { applySunLight } from './lighting';
 import { AXES, AxisGizmo, axisDirection, closestOnLine, gizmoAxis, type Axis } from './gizmo';
 import { EntityBatch } from './entities';
 import { yieldToBrowser } from './scheduling';
+import { airspaceEntities } from './airspace';
+import type { AirspaceZone } from '@odc/core';
 
 export type PickTarget =
   | { kind: 'waypoint' | 'poi'; id: string }
@@ -111,6 +113,8 @@ export class MissionScene {
   private readonly missionLayer = new CustomDataSource('mission');
   private readonly droneLayer = new CustomDataSource('drone');
   private readonly obstacleLayer = new CustomDataSource('obstacles');
+  private readonly airspaceLayer = new CustomDataSource('airspace');
+  private airspaceZones?: AirspaceZone[];
   private readonly handler: ScreenSpaceEventHandler;
   private readonly frustumCamera: Camera;
   private frustum?: DebugCameraPrimitive;
@@ -166,6 +170,7 @@ export class MissionScene {
     this.viewer.dataSources.add(this.missionLayer);
     this.viewer.dataSources.add(this.droneLayer);
     this.viewer.dataSources.add(this.obstacleLayer);
+    this.viewer.dataSources.add(this.airspaceLayer);
     this.gizmo = new AxisGizmo(this.viewer.camera);
     this.viewer.dataSources.add(this.gizmo.layer);
 
@@ -719,6 +724,18 @@ export class MissionScene {
       });
     });
     ents.finish();
+    this.viewer.scene.requestRender();
+  }
+
+  /** Toggle visualization only; the app checks crossings independently of map visibility. */
+  setAirspace(zones: AirspaceZone[], visible: boolean) {
+    if (zones !== this.airspaceZones) {
+      this.airspaceZones = zones;
+      const entities = new EntityBatch(this.airspaceLayer.entities);
+      for (const entity of airspaceEntities(zones)) entities.upsert(entity);
+      entities.finish();
+    }
+    this.airspaceLayer.show = visible;
     this.viewer.scene.requestRender();
   }
 

@@ -15,6 +15,8 @@ import { resetLocalTiles } from '@odc/cesium-view';
 import { canDownload, localServerUrl, useLocalData, watchDownloads } from './localData';
 import { useProject } from './projectStore';
 import { useProjectLifecycle } from './useProjectLifecycle';
+import { useAirspace, useAirspaceAnalysis } from './airspaceStore';
+import { useUpdates } from './updateStore';
 
 export function App() {
   const [dialog, setDialog] = useState<'export' | 'settings' | 'render' | undefined>();
@@ -25,7 +27,16 @@ export function App() {
   const screen = useProject((s) => s.screen);
   const pendingAction = useProject((s) => s.pendingAction);
   const busy = useProject((s) => s.busy);
+  const installing = useUpdates((s) => s.phase === 'installing');
   useProjectLifecycle();
+  useAirspaceAnalysis();
+
+  useEffect(() => {
+    void useAirspace.getState().initialize();
+  }, []);
+  useEffect(() => {
+    void useUpdates.getState().check(true);
+  }, []);
 
   useEffect(() => {
     // The desktop tile server falls back to another port if the usual one is taken.
@@ -54,6 +65,10 @@ export function App() {
   useEffect(() => {
     // Fly mode captures its own keys (capture phase) before this handler sees them.
     const onKey = (e: KeyboardEvent) => {
+      if (useUpdates.getState().phase === 'installing') {
+        e.preventDefault();
+        return;
+      }
       const project = useProject.getState();
       const mod = e.ctrlKey || e.metaKey;
       const key = e.key.toLowerCase();
@@ -111,7 +126,10 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <div className="app-content" inert={!!dialog || !!pendingAction || busy === 'opening'}>
+      <div
+        className="app-content"
+        inert={!!dialog || !!pendingAction || busy === 'opening' || installing}
+      >
         {screen === 'home' ? (
           <ProjectHome onSettings={() => setDialog('settings')} />
         ) : (
@@ -134,14 +152,26 @@ export function App() {
           {toast.text}
         </div>
       )}
-      {dialog === 'export' && <ExportDialog onClose={() => setDialog(undefined)} />}
-      {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(undefined)} />}
-      {dialog === 'render' && <RenderDialog onClose={() => setDialog(undefined)} />}
-      {pendingAction && <UnsavedDialog />}
+      <div inert={installing}>
+        {dialog === 'export' && <ExportDialog onClose={() => setDialog(undefined)} />}
+        {dialog === 'settings' && <SettingsDialog onClose={() => setDialog(undefined)} />}
+        {dialog === 'render' && <RenderDialog onClose={() => setDialog(undefined)} />}
+        {pendingAction && <UnsavedDialog />}
+      </div>
       {busy === 'opening' && (
         <div className="project-busy" role="status">
           <span className="loading-spinner" />
           Opening project…
+        </div>
+      )}
+      {installing && (
+        <div
+          className="update-installing"
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="Installing update"
+        >
+          Installing verified update… Please keep the app open.
         </div>
       )}
     </div>

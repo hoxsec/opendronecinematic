@@ -3,3 +3,5 @@ export * from './litchi';
 export * from './dji-wpml';
 export * from './mavlink';
 export * from './import';
+export * from './registry';
+export * from './builtins';
