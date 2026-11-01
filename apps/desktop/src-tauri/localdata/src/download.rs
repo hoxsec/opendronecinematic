@@ -147,17 +147,7 @@ pub(crate) fn ensure_pmtiles_cli(root: &Path, agent: &ureq::Agent) -> Result<Pat
 
     let wanted = exe.file_name().unwrap().to_string_lossy().to_string();
     let binary = if name.ends_with(".zip") {
-        let mut zip = zip::ZipArchive::new(std::io::Cursor::new(&archive))?;
-        let idx = (0..zip.len())
-            .find(|&i| {
-                zip.by_index(i).is_ok_and(|f| {
-                    Path::new(f.name()).file_name().is_some_and(|n| n.to_string_lossy() == wanted)
-                })
-            })
-            .ok_or_else(|| anyhow!("{wanted} not found in {name}"))?;
-        let mut out = Vec::new();
-        zip.by_index(idx)?.read_to_end(&mut out)?;
-        out
+        read_zip_binary(&archive, &wanted).with_context(|| format!("reading {name}"))?
     } else {
         let mut tar = tar::Archive::new(flate2::read::GzDecoder::new(&archive[..]));
         let mut found = None;
@@ -183,6 +173,24 @@ pub(crate) fn ensure_pmtiles_cli(root: &Path, agent: &ureq::Agent) -> Result<Pat
     }
     fs::rename(&tmp, &exe)?;
     Ok(exe)
+}
+
+/// Read only the requested regular file; never extract archive-controlled paths to disk.
+fn read_zip_binary(archive: &[u8], wanted: &str) -> Result<Vec<u8>> {
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(archive))?;
+    for i in 0..zip.len() {
+        let mut entry = zip.by_index(i)?;
+        let name = entry.name().context("invalid ZIP entry filename")?;
+        if Path::new(name.as_ref()).file_name().is_some_and(|n| n.to_string_lossy() == wanted)
+            && entry.is_file()
+            && !entry.is_symlink()
+        {
+            let mut out = Vec::new();
+            entry.read_to_end(&mut out)?;
+            return Ok(out);
+        }
+    }
+    bail!("{wanted} not found in ZIP archive")
 }
 
 /// Date key of the newest Protomaps daily planet build, e.g. "20261028".
@@ -298,7 +306,49 @@ fn parse_percent(line: &str) -> Option<f64> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_percent;
+    use super::{parse_percent, read_zip_binary};
+    use std::io::{Cursor, Write};
+    use zip::write::SimpleFileOptions;
+
+    fn binary_archive(path: &str) -> Vec<u8> {
+        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        zip.start_file(path, SimpleFileOptions::default()).unwrap();
+        zip.write_all(b"test executable").unwrap();
+        zip.finish().unwrap().into_inner()
+    }
+
+    #[test]
+    fn reads_zip_binary_by_basename() {
+        for path in ["pmtiles.exe", "release/pmtiles.exe"] {
+            assert_eq!(read_zip_binary(&binary_archive(path), "pmtiles.exe").unwrap(), b"test executable");
+        }
+    }
+
+    #[test]
+    fn rejects_missing_binary_and_invalid_archive() {
+        assert!(read_zip_binary(&binary_archive("other.exe"), "pmtiles.exe").is_err());
+        assert!(read_zip_binary(b"not a zip", "pmtiles.exe").is_err());
+    }
+
+    #[test]
+    fn rejects_symlink_binary() {
+        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        zip.add_symlink("pmtiles.exe", "other.exe", SimpleFileOptions::default()).unwrap();
+        let archive = zip.finish().unwrap().into_inner();
+        assert!(read_zip_binary(&archive, "pmtiles.exe").is_err());
+    }
+
+    #[test]
+    fn rejects_corrupted_binary() {
+        let mut zip = zip::ZipWriter::new(Cursor::new(Vec::new()));
+        let options = SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("pmtiles.exe", options).unwrap();
+        zip.write_all(b"test executable").unwrap();
+        let mut archive = zip.finish().unwrap().into_inner();
+        let offset = archive.windows(15).position(|bytes| bytes == b"test executable").unwrap();
+        archive[offset] ^= 1;
+        assert!(read_zip_binary(&archive, "pmtiles.exe").is_err());
+    }
 
     #[test]
     fn reads_progress_bars() {
