@@ -43,24 +43,24 @@
 
 ## ✨ Features
 
-| Feature                        | What it does                                                                                                                             |
-| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| 🗂️ **Projects and recovery**   | A project home with recent files, portable `.odc.json` projects, Save / Save as, local recovery drafts and unsaved-change protection.    |
-| 🧭 **Flight organization**     | Named waypoints and groups, drag-and-drop ordering, searchable filters, visible bulk actions, and an outline designed for large surveys. |
-| 🌍 **Plan on a real 3D globe** | Cesium World Terrain, aerial imagery, OSM Buildings, Google Photorealistic 3D Tiles, or your own photogrammetry.                         |
-| 🎯 **Aim the camera exactly**  | Points of interest, heading and gimbal modes per waypoint, smooth easing between them.                                                   |
-| 🎥 **See what the drone sees** | A live camera view using the drone's real field of view. Swap it with the map at any time.                                               |
-| ☀️ **Sun and golden hour**     | Real sun lighting and shadows for the shoot date and time, golden and blue hour on a day strip, and the light on your shot.              |
-| 🔭 **Zoom and dolly zoom**     | Per-waypoint focal length with real lens data, lens-switch and digital-zoom marks, a vertigo template and framing guides.                |
-| 🕹️ **Fly mode**                | Fly a simulated drone with keyboard, mouse or gamepad. Drop waypoints, mark POIs, or record a flight path.                               |
-| 🎬 **Shot templates**          | Orbit, helix, reveal, dolly, fly-by and dronie, generated around a subject in one click.                                                 |
-| 🗺️ **Survey grids**            | Draw an area, set height and overlap, get a lawnmower grid with GSD, photo count and distance-triggered photos.                          |
-| 🛡️ **Safety checks**           | Terrain and building clearance, 120 m ceiling, range, speed, climb rate and battery.                                                     |
-| 🗺️ **Airspace overlays**       | Import local GeoJSON footprints, see potential route crossings, and keep source/freshness limits explicit. No live regulatory feed.      |
-| 📤 **Export to your drone**    | Litchi CSV, DJI WPML/KMZ, QGroundControl `.plan` and Mission Planner, with an option to match the preview.                               |
-| 📥 **Import missions**         | Open Litchi CSV, DJI KMZ, QGC `.plan` and Mission Planner files to preview, edit and re-export them.                                     |
-| ⛰️ **GeoTIFF terrain**         | Load your own elevation model (SRTM, Copernicus, lidar) for offline terrain, safety checks and terrain following.                        |
-| 🎞️ **Render previz video**     | Frame-exact MP4, WebM or GIF at up to 4K. Compare takes side by side with the live view.                                                 |
+| Feature                        | What it does                                                                                                                                                 |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 🗂️ **Projects and recovery**   | A project home with recent files, portable `.odc.json` projects, Save / Save as, local recovery drafts and unsaved-change protection.                        |
+| 🧭 **Flight organization**     | Named waypoints and groups, drag-and-drop ordering, searchable filters, visible bulk actions, and an outline designed for large surveys.                     |
+| 🌍 **Plan on a real 3D globe** | Cesium World Terrain, aerial imagery, OSM Buildings, Google Photorealistic 3D Tiles, or your own photogrammetry.                                             |
+| 🎯 **Aim the camera exactly**  | Points of interest, heading and gimbal modes per waypoint, smooth easing between them.                                                                       |
+| 🎥 **See what the drone sees** | A live camera view using the drone's real field of view. Swap it with the map at any time.                                                                   |
+| ☀️ **Sun and golden hour**     | Real sun lighting and shadows for the shoot date and time, golden and blue hour on a day strip, and the light on your shot.                                  |
+| 🔭 **Zoom and dolly zoom**     | Per-waypoint focal length with real lens data, lens-switch and digital-zoom marks, a vertigo template and framing guides.                                    |
+| 🕹️ **Fly mode**                | Fly a simulated drone with keyboard, mouse or gamepad. Drop waypoints, mark POIs, or record a flight path.                                                   |
+| 🎬 **Shot templates**          | Orbit, helix, reveal, dolly, fly-by and dronie, generated around a subject in one click.                                                                     |
+| 🗺️ **Survey grids**            | Draw an area, set height and overlap, get a lawnmower grid with GSD, photo count and distance-triggered photos.                                              |
+| 🛡️ **Safety checks**           | Terrain and building clearance, 120 m ceiling, range, speed, climb rate and battery.                                                                         |
+| 🗺️ **Airspace overlays**       | Download OpenAIP country airspaces or import GeoJSON footprints, with route-crossing warnings and explicit source/freshness limits. No live regulatory feed. |
+| 📤 **Export to your drone**    | Litchi CSV, DJI WPML/KMZ, QGroundControl `.plan` and Mission Planner, with an option to match the preview.                                                   |
+| 📥 **Import missions**         | Open Litchi CSV, DJI KMZ, QGC `.plan` and Mission Planner files to preview, edit and re-export them.                                                         |
+| ⛰️ **GeoTIFF terrain**         | Load your own elevation model (SRTM, Copernicus, lidar) for offline terrain, safety checks and terrain following.                                            |
+| 🎞️ **Render previz video**     | Frame-exact MP4, WebM or GIF at up to 4K. Compare takes side by side with the live view.                                                                     |
 
 ---
 
@@ -273,7 +273,7 @@ Distance-triggered photos export as Litchi `photo_distinterval`, DJI WPML `multi
 </table>
 
 > [!NOTE]
-> Clearance checks need real terrain, so add a free Cesium ion token (see [Map data](#map-data)). **Safety → Airspace overlays** can import local GeoJSON for horizontal footprint warnings. No authoritative coverage or live NOTAM feed is included; altitude limits and activation are not evaluated. Always check official sources. See [Airspace overlays](docs/airspace.md).
+> Clearance checks need real terrain, so add a free Cesium ion token (see [Map data](#map-data)). **Safety → Airspace overlays** can download OpenAIP country airspaces in the desktop app or import local GeoJSON for horizontal footprint warnings. No authoritative coverage or live NOTAM feed is included; altitude limits and activation are not evaluated. Always check official sources. See [Airspace overlays](docs/airspace.md).
 
 ### 8. Export to your drone
 

@@ -1,8 +1,20 @@
 # Airspace overlays
 
-**Safety → Airspace overlays** imports a local GeoJSON file, draws colored footprints on the planning map, and checks the preview route for potential horizontal crossings. Click a warning to locate the first approximate crossing and scrub the timeline to it.
+**Safety → Airspace overlays** downloads OpenAIP country airspaces or imports a local GeoJSON file, draws colored footprints on the planning map, and checks the preview route for potential horizontal crossings. Click a warning to locate the first approximate crossing and scrub the timeline to it.
 
-**This is not flight clearance or a live regulatory service.** No country coverage is included. Obtain current data from a source you trust and independently check official airspace, NOTAMs, temporary restrictions, permissions and local rules before every flight. OpenStreetMap airfield/obstacle warnings are separate and are not authoritative airspace boundaries.
+**This is not flight clearance or a live regulatory service.** No country coverage is bundled or guaranteed. Obtain current data from a source you trust and independently check official airspace, NOTAMs, temporary restrictions, permissions and local rules before every flight. OpenStreetMap airfield/obstacle warnings are separate and are not authoritative airspace boundaries.
+
+## Download OpenAIP airspaces
+
+In the **desktop app**, enter a two-letter country code (for example `AT`, `DE` or `GB`) and click **Download OpenAIP airspaces**. No account or API key is needed. The app requests the daily GeoJSON export from `https://storage.openaip.net/openaip-system-exports/<country>_asp.geojson`, converts its provider-specific properties, validates it, and replaces the current layer. The saved layer works offline; downloading again is a manual refresh, not a live feed. Only one country/layer is retained at a time.
+
+In the **browser**, direct downloads are unavailable because the provider does not allow cross-origin requests. Download an **airspace GeoJSON** file from [OpenAIP Data Exports](https://www.openaip.net/data/exports), then choose **Import OpenAIP…**. This also works in the desktop app. JSON API, OpenAIR, XML and newline-delimited exports are not supported by this importer.
+
+OpenAIP data is attributed to [OpenAIP](https://www.openaip.net) under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). Check the provider's licensing terms for commercial use; the app's MIT license does not license this dataset.
+
+The adapter preserves provider IDs, names, polygon geometry, and published lower/upper limits as text (`m`/`ft` with GND/MSL/STD datum, or FL). It maps restricted, danger, prohibited, TRA, TSA, protected and low-altitude restriction types to **restricted**; CTR, MCTR, TMA, CTA and ICAO classes A–E to **controlled**; remaining/unknown types to **advisory**. Original type/class codes and conditional-activation flags remain in crossing descriptions. These colors are planning categories, **not legal determinations**. No zones are filtered out by altitude or activation.
+
+The existing 10 MB, 5,000-feature and 200,000-position limits apply to both raw and converted exports. Oversized exports, unavailable countries, rate limits, network failures or invalid geometry leave the previous layer unchanged. There are no automatic retries; wait before retrying a rate-limited request. Export generation/download time is not a validity interval: freshness remains **unknown**, and coverage may be incomplete. Special rules areas are a separate OpenAIP dataset and are not included.
 
 ## Supported files
 
@@ -17,7 +29,7 @@ Optional feature properties:
 | `lower`, `upper` | Published altitude-limit **text labels**, e.g. `SFC`, `1500 ft AMSL`   |
 | `description`    | Plain-text information displayed with a crossing warning               |
 
-Feature `id`, if present, must be unique. IDs are generated for features without one. Additional properties are ignored, not interpreted as flight rules. Convert provider-specific schemas explicitly; in particular, do not assume EASA U-space, OpenAIP or national datasets use these property names/categories.
+Feature `id`, if present, must be unique. IDs are generated for features without one. Additional properties are ignored, not interpreted as flight rules. Convert provider-specific schemas explicitly; do not assume EASA U-space or national datasets use these property names/categories. For OpenAIP exports, use **Import OpenAIP…**, not the generic **Import GeoJSON…** action.
 
 Optional collection members are `source` (plain-text attribution) and `validUntil` (ISO timestamp with timezone). Missing validity is displayed as **freshness unknown**, and elapsed validity as **expired**. These are source declarations, not guarantees; importing a file does not refresh its publication date. Expired layers continue to warn about potential crossings.
 
