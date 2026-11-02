@@ -10,6 +10,7 @@ import {
 import { deleteAirspace, loadAirspace, saveAirspace, type StoredAirspace } from './airspaceStorage';
 import { useStore } from './store';
 import { runAnalysis } from './analysisWorker';
+import { convertOpenAip, downloadOpenAip, openAipCountry } from './openaip';
 
 export interface AirspaceLayer extends StoredAirspace {
   data: AirspaceData;
@@ -27,7 +28,8 @@ interface AirspaceState {
     error?: string;
   };
   initialize(): Promise<void>;
-  importFile(fileName: string, bytes: Uint8Array): Promise<void>;
+  importFile(fileName: string, bytes: Uint8Array, format?: 'openaip'): Promise<void>;
+  downloadCountry(country: string): Promise<void>;
   setVisible(visible: boolean): Promise<void>;
   remove(): Promise<void>;
 }
@@ -59,31 +61,19 @@ export const useAirspace = create<AirspaceState>((set, get) => ({
       set({ busy: false, initialized: true });
     }
   },
-  async importFile(fileName, bytes) {
-    if (get().busy) return;
-    set({ busy: true, error: undefined });
-    try {
+  async importFile(fileName, bytes, format) {
+    return replaceAirspace(fileName, async () => {
       if (bytes.byteLength > AIRSPACE_MAX_BYTES)
         throw new Error('Airspace file exceeds the 10 MB limit.');
       const json = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
-      const data = parseAirspaceGeoJson(json);
-      const stored = { fileName, json, importedAt: Date.now(), visible: true };
-      try {
-        await saveAirspace(stored);
-      } catch {
-        set({
-          error:
-            'Airspace is available for this session only: local storage could not be updated. A previous layer may return after restarting.',
-        });
-      }
-      set({ layer: { ...stored, data }, initialized: true });
-    } catch (error) {
-      set({
-        error: `${error instanceof Error ? error.message : String(error)} The previous layer is unchanged.`,
-      });
-    } finally {
-      set({ busy: false });
-    }
+      return format === 'openaip' ? convertOpenAip(json) : json;
+    });
+  },
+  async downloadCountry(country) {
+    return replaceAirspace(`${country.trim().toUpperCase()} OpenAIP.geojson`, async () => {
+      const code = openAipCountry(country);
+      return convertOpenAip(await downloadOpenAip(code), code);
+    });
   },
   async setVisible(visible) {
     const layer = get().layer;
@@ -113,6 +103,33 @@ export const useAirspace = create<AirspaceState>((set, get) => ({
     }
   },
 }));
+
+/** Keep download, conversion and persistence under the same replacement lock. */
+async function replaceAirspace(fileName: string, readJson: () => Promise<string>) {
+  const { getState: get, setState: set } = useAirspace;
+  if (get().busy) return;
+  set({ busy: true, error: undefined });
+  try {
+    const json = await readJson();
+    const data = parseAirspaceGeoJson(json);
+    const stored = { fileName, json, importedAt: Date.now(), visible: true };
+    try {
+      await saveAirspace(stored);
+    } catch {
+      set({
+        error:
+          'Airspace is available for this session only: local storage could not be updated. A previous layer may return after restarting.',
+      });
+    }
+    set({ layer: { ...stored, data }, initialized: true });
+  } catch (error) {
+    set({
+      error: `${error instanceof Error ? error.message : String(error)} The previous layer is unchanged.`,
+    });
+  } finally {
+    set({ busy: false });
+  }
+}
 
 /** One cancellable worker per settled edit, shared by the inspector and export dialog. */
 export function useAirspaceAnalysis() {

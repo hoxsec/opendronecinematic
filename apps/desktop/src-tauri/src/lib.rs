@@ -2,6 +2,7 @@ use odc_localdata::{DownloadRequest, GeofabrikRegion, LocalData, RegionMeta};
 use std::sync::Arc;
 use tauri::{Emitter, Manager, State};
 
+mod openaip;
 mod project_files;
 
 type Local<'a> = State<'a, Arc<LocalData>>;
@@ -127,6 +128,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             project_files::remember_project_path,
+            openaip::download_openaip_airspace,
             local_server_url,
             geofabrik_regions,
             region_pbf_size,

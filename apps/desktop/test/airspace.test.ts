@@ -2,6 +2,7 @@ import 'fake-indexeddb/auto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as storage from '../src/airspaceStorage';
 import { useAirspace } from '../src/airspaceStore';
+import * as openaip from '../src/openaip';
 
 const json = JSON.stringify({
   type: 'FeatureCollection',
@@ -39,6 +40,54 @@ beforeEach(async () => {
 });
 
 describe('local airspace layers', () => {
+  const providerJson = () => {
+    const data = JSON.parse(json);
+    Object.assign(data.features[0].properties, { type: 4, country: 'AT', icaoClass: 3 });
+    return JSON.stringify(data);
+  };
+  it('downloads, converts and persists OpenAIP for offline reload', async () => {
+    const download = vi.spyOn(openaip, 'downloadOpenAip').mockResolvedValue(providerJson());
+    await useAirspace.getState().downloadCountry('AT');
+    expect(download).toHaveBeenCalledWith('at');
+    expect(useAirspace.getState().layer?.data.zones[0]!.category).toBe('controlled');
+    useAirspace.setState({ layer: undefined, initialized: false });
+    await useAirspace.getState().initialize();
+    expect(useAirspace.getState().layer?.data.source).toContain('OpenAIP');
+  });
+  it('keeps the previous layer after download or provider validation failures', async () => {
+    await useAirspace.getState().importFile('zones.geojson', bytes);
+    const before = useAirspace.getState().layer;
+    const download = vi
+      .spyOn(openaip, 'downloadOpenAip')
+      .mockRejectedValue(new Error('rate limit'));
+    await useAirspace.getState().downloadCountry('AT');
+    expect(useAirspace.getState().layer).toBe(before);
+    expect(useAirspace.getState().error).toContain('rate limit');
+    download.mockResolvedValue('{}');
+    await useAirspace.getState().downloadCountry('AT');
+    expect(useAirspace.getState().layer).toBe(before);
+    expect(useAirspace.getState().busy).toBe(false);
+  });
+  it('locks replacement during a download and supports manual provider import', async () => {
+    let finish!: (json: string) => void;
+    const download = vi.spyOn(openaip, 'downloadOpenAip').mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = useAirspace.getState().downloadCountry('AT');
+    expect(useAirspace.getState().busy).toBe(true);
+    await useAirspace.getState().downloadCountry('DE');
+    expect(download).toHaveBeenCalledTimes(1);
+    finish(providerJson());
+    await pending;
+    await useAirspace
+      .getState()
+      .importFile('manual.geojson', new TextEncoder().encode(providerJson()), 'openaip');
+    expect(useAirspace.getState().layer?.fileName).toBe('manual.geojson');
+    expect(useAirspace.getState().layer?.data.source).toContain('OpenAIP');
+  });
   it('persists and reloads a validated layer independently of a project', async () => {
     await useAirspace.getState().importFile('zones.geojson', bytes);
     expect(useAirspace.getState().layer?.data.zones[0]!.name).toBe('Test zone');

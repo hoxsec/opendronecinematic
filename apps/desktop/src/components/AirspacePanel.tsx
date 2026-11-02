@@ -2,14 +2,17 @@ import { useEffect, useState } from 'react';
 import { fmtTime } from '@odc/core';
 import { useAirspace, useAirspaceConflicts } from '../airspaceStore';
 import { activeScene } from '../sceneAccess';
-import { openBinaryFile } from '../platform';
+import { isTauri, openBinaryFile } from '../platform';
+import { OPENAIP_EXPORTS } from '../openaip';
 import { useStore } from '../store';
 import { Section } from './fields';
 
 export function AirspacePanel() {
-  const { layer, busy, initialized, error, importFile, setVisible, remove } = useAirspace();
+  const { layer, busy, initialized, error, importFile, downloadCountry, setVisible, remove } =
+    useAirspace();
   const { conflicts, pending, error: checkError } = useAirspaceConflicts();
   const [picking, setPicking] = useState(false);
+  const [country, setCountry] = useState('');
   // Re-evaluate expiry while the app remains open. Expired layers still warn about crossings.
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
@@ -17,13 +20,13 @@ export function AirspacePanel() {
     return () => window.clearInterval(timer);
   }, []);
   const expired = layer?.data.validUntil && Date.parse(layer.data.validUntil) <= now;
-  const load = async () => {
+  const load = async (format?: 'openaip') => {
     setPicking(true);
     try {
       const file = await openBinaryFile([
         { name: 'Airspace GeoJSON', extensions: ['geojson', 'json'] },
       ]);
-      if (file) await importFile(file.name, file.data);
+      if (file) await importFile(file.name, file.data, format);
     } catch (error) {
       useStore.getState().notify(`Could not open airspace: ${String(error)}`, 'error');
     } finally {
@@ -36,6 +39,44 @@ export function AirspacePanel() {
       <p className="note">
         Planning aid, not flight clearance. No live airspace or NOTAM feed is connected. Always
         check the official authority before flying.
+      </p>
+      <label>
+        OpenAIP country code
+        <input
+          type="text"
+          value={country}
+          onChange={(e) => setCountry(e.target.value.toUpperCase())}
+          maxLength={2}
+          placeholder="e.g. AT, DE, GB"
+          disabled={busy || picking}
+        />
+      </label>
+      <div className="button-row">
+        <button
+          disabled={!isTauri() || !initialized || busy || picking || !/^[A-Z]{2}$/.test(country)}
+          onClick={() => void downloadCountry(country)}
+        >
+          {busy ? 'Loading…' : 'Download OpenAIP airspaces'}
+        </button>
+        <button disabled={!initialized || busy || picking} onClick={() => void load('openaip')}>
+          Import OpenAIP…
+        </button>
+      </div>
+      <p className="muted small">
+        Daily GeoJSON exports, no API key. Replaces the current layer; saved locally for offline
+        use.
+        {!isTauri() &&
+          ' Direct downloads require the desktop app. In the browser, download airspace GeoJSON from OpenAIP and import it here.'}{' '}
+        Data ©{' '}
+        <a href={OPENAIP_EXPORTS} target="_blank" rel="noreferrer">
+          OpenAIP
+        </a>
+        {' · '}
+        <a href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank" rel="noreferrer">
+          CC BY-NC 4.0
+        </a>
+        . Check licensing for commercial use. Export date does not establish validity or complete
+        coverage.
       </p>
       {error && (
         <p className="note" role="alert">

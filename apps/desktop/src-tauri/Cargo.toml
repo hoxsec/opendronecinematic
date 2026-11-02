@@ -1,6 +1,6 @@
 [package]
 name = "opendronecinematic"
-version = "1.4.0"
+version = "1.4.1"
 description = "Open-source 3D drone flight planner"
 edition = "2021"
 license = "MIT"
@@ -27,3 +27,4 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 odc-localdata = { path = "localdata" }
 anyhow = "1"
+ureq = "2"
