@@ -1,6 +1,6 @@
 [package]
 name = "opendronecinematic"
-version = "1.3.0"
+version = "1.4.0"
 description = "Open-source 3D drone flight planner"
 edition = "2021"
 license = "MIT"
