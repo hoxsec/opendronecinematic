@@ -17,6 +17,8 @@ import { useProject } from './projectStore';
 import { useProjectLifecycle } from './useProjectLifecycle';
 import { useAirspace, useAirspaceAnalysis } from './airspaceStore';
 import { useUpdates } from './updateStore';
+import { TitleBar } from './components/TitleBar';
+import { isTauri } from './platform';
 
 export function App() {
   const [dialog, setDialog] = useState<'export' | 'settings' | 'render' | undefined>();
@@ -125,7 +127,8 @@ export function App() {
   }, [dialog]);
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${isTauri() ? ' desktop-shell' : ''}`}>
+      {isTauri() && <TitleBar />}
       <div
         className="app-content"
         inert={!!dialog || !!pendingAction || busy === 'opening' || installing}

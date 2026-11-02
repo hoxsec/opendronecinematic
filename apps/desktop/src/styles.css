@@ -1269,6 +1269,134 @@ input[type='range'] {
 }
 
 /* Application shell and project lifecycle. The planner itself keeps its existing layout. */
+.desktop-shell {
+  display: flex;
+  flex-direction: column;
+}
+.desktop-shell > .app-content {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+}
+.titlebar {
+  position: relative;
+  z-index: 100;
+  display: flex;
+  flex: 0 0 36px;
+  height: 36px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+.titlebar-drag {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex: 1;
+  min-width: 0;
+  padding: 0 14px;
+}
+/* The entire non-interactive surface must be a native drag target, including its text. */
+.titlebar-drag > * {
+  pointer-events: none;
+}
+.titlebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.1px;
+}
+.titlebar-brand img {
+  width: 20px;
+  height: 20px;
+}
+.titlebar-accent,
+.titlebar-dirty {
+  color: var(--accent);
+}
+.titlebar-project {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 11px;
+}
+.titlebar-dirty {
+  margin-right: 7px;
+  font-size: 8px;
+}
+.titlebar-inactive .titlebar-drag {
+  opacity: 0.6;
+}
+.titlebar-controls {
+  display: flex;
+  flex-shrink: 0;
+}
+.titlebar-controls button {
+  width: 46px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.titlebar-controls svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+.titlebar-controls button:hover:not(:disabled) {
+  background: var(--panel-2);
+}
+.titlebar-controls .window-close:hover:not(:disabled) {
+  background: #c42b1c;
+  color: white;
+}
+.titlebar-controls button:focus-visible {
+  outline-offset: -3px;
+}
+.titlebar-mac .titlebar-controls {
+  order: -1;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 0 14px;
+}
+.titlebar-mac .titlebar-controls button {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  color: #30231f;
+}
+.titlebar-mac .window-close,
+.titlebar-mac .window-close:hover:not(:disabled) {
+  order: -1;
+  background: #ff5f57;
+}
+.titlebar-mac .window-minimize,
+.titlebar-mac .window-minimize:hover:not(:disabled) {
+  background: #febc2e;
+}
+.titlebar-mac .window-maximize,
+.titlebar-mac .window-maximize:hover:not(:disabled) {
+  background: #28c840;
+}
+.titlebar-mac .titlebar-controls svg {
+  width: 9px;
+  height: 9px;
+  opacity: 0;
+}
+.titlebar-mac .titlebar-controls:hover svg,
+.titlebar-mac .titlebar-controls button:focus-visible svg {
+  opacity: 1;
+}
+.titlebar-mac .titlebar-controls button:hover:not(:disabled) {
+  filter: brightness(1.12);
+}
+.titlebar-mac.titlebar-inactive .titlebar-controls button {
+  background: var(--border);
+}
 .app-shell,
 .app-content {
   height: 100%;
